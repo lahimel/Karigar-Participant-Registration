@@ -205,6 +205,7 @@ table.ledger td.readonly{
   padding:7px 9px;
 }
 table.ledger tr.invalid td{background:var(--rust-bg);}
+table.ledger tr.duplicate td{box-shadow: inset 3px 0 0 var(--brass);}
 table.ledger tr:nth-child(even) td:not(.invalid-cell){background-color:rgba(0,0,0,0.015);}
 .err-note{font-size:11px;color:var(--rust);padding:2px 9px 6px;font-family:system-ui,sans-serif;}
 #gridErrors{
@@ -219,6 +220,18 @@ table.ledger tr:nth-child(even) td:not(.invalid-cell){background-color:rgba(0,0,
 }
 #gridErrors.show{display:block;}
 #gridErrors ul{margin:6px 0 0;padding-left:18px;}
+#dupWarnings{
+  margin-top:12px;
+  font-size:13px;
+  color:var(--brass-dark);
+  background:#F1EBDD;
+  border:1px solid var(--brass);
+  border-radius:3px;
+  padding:10px 14px;
+  display:none;
+}
+#dupWarnings.show{display:block;}
+#dupWarnings ul{margin:6px 0 0;padding-left:18px;}
 .totals{
   display:flex;
   gap:28px;
@@ -325,6 +338,7 @@ table.ledger tr:nth-child(even) td:not(.invalid-cell){background-color:rgba(0,0,
     <div class="grid-toolbar">
       <button type="button" id="addRowBtn">+ Add row</button>
       <button type="button" id="clearGridBtn">Clear grid</button>
+      <button type="button" id="checkDupBtn">Check duplicates</button>
       <button type="button" id="exportCsvBtn">Export backup CSV</button>
       <span class="hint" id="rowCountHint">0 rows</span>
     </div>
@@ -352,6 +366,7 @@ table.ledger tr:nth-child(even) td:not(.invalid-cell){background-color:rgba(0,0,
       </table>
     </div>
     <div id="gridErrors"></div>
+    <div id="dupWarnings"></div>
   </section>
 
   <section class="card" data-num="4">
@@ -420,7 +435,7 @@ const CHOICES = {"enroll_type_list": [{"name": "individual", "label": "Individua
 
 // ---- CONFIG: fill these in after you deploy the Apps Script web app ----
 const CONFIG = {
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwaKwTpG7GphyBM92BJJudBWdeiBNoX7KWIoX7bJDTmkwiuU7zNUH4CkLUgXpQSkkca/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxcfBYPy5icC9SxhHRdnTgey1rsldIoONlK-Z6nCp_2MGFbCxULbh5ZOXUjVh3snV5w/exec",
   SECRET_TOKEN: "AjAYME31Z5dgntu60g34"
 };
 // --------------------------------------------------------------------
@@ -438,6 +453,8 @@ const els = {
   studentBody: document.getElementById('studentBody'),
   addRowBtn: document.getElementById('addRowBtn'),
   clearGridBtn: document.getElementById('clearGridBtn'),
+  checkDupBtn: document.getElementById('checkDupBtn'),
+  dupWarnings: document.getElementById('dupWarnings'),
   exportCsvBtn: document.getElementById('exportCsvBtn'),
   rowCountHint: document.getElementById('rowCountHint'),
   gridErrors: document.getElementById('gridErrors'),
@@ -661,6 +678,7 @@ function resetForm(){
   els.otherSpecify.value = '';
   computeTotals();
   els.statusMsg.textContent = '';
+  clearDraft();
 }
 els.resetBtn.addEventListener('click', resetForm);
 
@@ -756,6 +774,11 @@ function isRowBlank(d){
 function validateGrid(){
   const rows = readGridRows();
   const errors = [];
+  const mobileCounts = {};
+  rows.forEach(r=>{
+    const m = r.data.mobile_number;
+    if(/^[0-9]{10}$/.test(m||'')) mobileCounts[m] = (mobileCounts[m]||0)+1;
+  });
   rows.forEach((r,i)=>{
     const d = r.data;
     r.tr.classList.remove('invalid');
@@ -772,6 +795,7 @@ function validateGrid(){
     if(!d.address) rowErrs.push('village/city area');
     if(!/^[0-9]{10}$/.test(d.mobile_number||'')) rowErrs.push('mobile (10 digits)');
     if(!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(d.email_id||'')) rowErrs.push('email');
+    if(mobileCounts[d.mobile_number] > 1) rowErrs.push('mobile repeated within this batch — check for a paste mistake');
     if(rowErrs.length){
       r.tr.classList.add('invalid');
       errors.push(`Row ${i+1}: ${rowErrs.join(', ')}`);
@@ -816,6 +840,44 @@ els.exportCsvBtn.addEventListener('click', ()=>{
   a.click();
 });
 
+// ---- Duplicate check against everything already saved on the server ----
+async function checkDuplicates(){
+  [...els.studentBody.children].forEach(tr=>tr.classList.remove('duplicate'));
+  els.dupWarnings.classList.remove('show');
+  els.dupWarnings.innerHTML = '';
+
+  const rows = readGridRows().map(r=>r.data).filter(d=>!isRowBlank(d));
+  const mobiles = [...new Set(rows.map(d=>d.mobile_number).filter(m=>/^[0-9]{10}$/.test(m||'')))];
+  if(!mobiles.length || CONFIG.APPS_SCRIPT_URL.includes('PASTE_YOUR_DEPLOYED')) return [];
+
+  try{
+    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({ token: CONFIG.SECRET_TOKEN, action: 'check_duplicates', mobiles })
+    });
+    const result = await resp.json();
+    if(result.status !== 'success') return [];
+    const matches = result.matches || [];
+    if(matches.length){
+      const matchMobiles = new Set(matches.map(m=>m.mobile_number));
+      const mobileColIdx = GRID_COLS.findIndex(c=>c.key==='mobile_number');
+      [...els.studentBody.children].forEach(tr=>{
+        const mob = (tr.children[mobileColIdx+1].textContent||'').trim();
+        if(matchMobiles.has(mob)) tr.classList.add('duplicate');
+      });
+      els.dupWarnings.innerHTML = `<strong>${matches.length} number(s) already in your records:</strong><ul>${
+        matches.slice(0,15).map(m=>`<li>${m.mobile_number} — ${m.full_name||'unnamed'}${m.course_label?` (previously: ${m.course_label}${m.batch_number?', Batch '+m.batch_number:''})`:''}</li>`).join('')
+      }</ul><div>Could be a genuine repeat student, or an accidental double-entry — worth a quick look.</div>`;
+      els.dupWarnings.classList.add('show');
+    }
+    return matches;
+  } catch(err){
+    return []; // soft check only — never block on a network hiccup here
+  }
+}
+els.checkDupBtn.addEventListener('click', checkDuplicates);
+
 // init grid with a few blank rows
 addRow();
 
@@ -856,6 +918,22 @@ async function submitBatch(){
     els.statusMsg.textContent = 'Fix before submitting: ' + problems.join('; ');
     els.statusMsg.style.color = 'var(--rust)';
     return;
+  }
+
+  els.statusMsg.style.color = 'var(--ink-soft)';
+  els.statusMsg.textContent = 'Checking for duplicates…';
+  const dupMatches = await checkDuplicates();
+  if(dupMatches.length){
+    const proceed = confirm(
+      `${dupMatches.length} mobile number(s) already appear in your records (highlighted in amber below).\n\n` +
+      `This might be a genuine repeat student enrolling in another course, or an accidental double-entry.\n\n` +
+      `Continue with registration anyway?`
+    );
+    if(!proceed){
+      els.statusMsg.textContent = 'Submission paused — review the highlighted rows, then submit again when ready.';
+      els.statusMsg.style.color = 'var(--brass-dark)';
+      return;
+    }
   }
 
   els.submitBtn.disabled = true;
@@ -920,6 +998,7 @@ async function submitBatch(){
         : `✓ Registered — ID ${result.registration_id}`;
       els.statusMsg.innerHTML = `<span class="stamp">${label}</span>`;
       els.submitBtn.disabled = false;
+      clearDraft();
     } else {
       throw new Error(result.message || 'Unknown error from server');
     }
@@ -932,6 +1011,121 @@ async function submitBatch(){
 
 els.submitBtn.addEventListener('click', submitBatch);
 refreshPaymentConditionals();
+
+// ---- Draft autosave (browser local storage — this page runs outside Claude's
+// sandbox as a normal static site, so localStorage is safe to use here) ----
+const DRAFT_KEY = 'karigar_registration_draft_v1';
+let draftSaveTimer = null;
+
+function scheduleDraftSave(){
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(saveDraftNow, 600);
+}
+
+function saveDraftNow(){
+  try{
+    const state = {
+      savedAt: Date.now(),
+      courseType: els.courseType.value,
+      labCenter: els.labCenter.value,
+      courseSelect: els.courseSelect.value,
+      enrollDate: els.enrollDate.value,
+      courseEndDate: els.courseEndDate.value,
+      batchNumber: els.batchNumber.value,
+      numStudents: els.numStudents.value,
+      students: readGridRows().map(r=>r.data),
+      feePerHead: els.feePerHead.value,
+      feeStatus: els.feeStatus.value,
+      payingOrgName: els.payingOrgName.value,
+      feePaid: els.feePaid.value,
+      feePayMode: els.feePayMode.value,
+      howKnow: els.howKnow.value,
+      referralName: els.referralName.value,
+      otherSpecify: els.otherSpecify.value
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(state));
+  } catch(err){
+    // Storage full/unavailable (e.g. private browsing) — fail silently.
+    // "Export backup CSV" remains the safety net for the student grid itself.
+  }
+}
+
+function clearDraft(){
+  try{ localStorage.removeItem(DRAFT_KEY); } catch(err){}
+}
+
+function fillRowFromSavedData(tr, data){
+  GRID_COLS.forEach((col,i)=>{
+    const td = tr.children[i+1];
+    if(col.type==='select'){
+      td.querySelector('select').value = data[col.key] || '';
+    } else {
+      td.textContent = data[col.key] || '';
+    }
+  });
+}
+
+function restoreDraft(state){
+  els.courseType.value = state.courseType || '';
+  els.courseType.dispatchEvent(new Event('change'));
+  els.labCenter.value = state.labCenter || '';
+  els.labCenter.dispatchEvent(new Event('change'));
+  els.courseSelect.value = state.courseSelect || '';
+  els.courseSelect.dispatchEvent(new Event('change'));
+
+  els.enrollDate.value = state.enrollDate || '';
+  els.courseEndDate.value = state.courseEndDate || '';
+  els.batchNumber.value = state.batchNumber || '';
+  els.numStudents.value = state.numStudents || '';
+
+  els.studentBody.innerHTML = '';
+  const students = (state.students && state.students.length) ? state.students : [{}];
+  students.forEach(data=>{
+    const tr = addRow();
+    fillRowFromSavedData(tr, data);
+  });
+  renumberRows();
+
+  els.feePerHead.value = state.feePerHead || '';
+  els.feeStatus.value = state.feeStatus || '';
+  els.feeStatus.dispatchEvent(new Event('change'));
+  els.payingOrgName.value = state.payingOrgName || '';
+  els.feePaid.value = state.feePaid || '';
+  els.feePayMode.value = state.feePayMode || '';
+  refreshPayModeConditionals();
+  els.howKnow.value = state.howKnow || '';
+  els.howKnow.dispatchEvent(new Event('change'));
+  els.referralName.value = state.referralName || '';
+  els.otherSpecify.value = state.otherSpecify || '';
+
+  validateGrid();
+  computeTotals();
+  els.statusMsg.textContent = 'Draft restored. Note: any payment screenshot was not saved — reattach it if needed.';
+  els.statusMsg.style.color = 'var(--brass-dark)';
+}
+
+function checkForDraftOnLoad(){
+  try{
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if(!raw) return;
+    const state = JSON.parse(raw);
+    const hasContent = state.courseType || state.batchNumber ||
+      (state.students && state.students.some(d=>d.first_name || d.mobile_number));
+    if(!hasContent){ clearDraft(); return; }
+    const when = state.savedAt ? new Date(state.savedAt).toLocaleString('en-IN') : 'earlier';
+    if(confirm(`Found an unsaved draft from ${when} — probably from a closed tab or browser crash.\n\nRestore it? (Cancel discards it and starts fresh.)`)){
+      restoreDraft(state);
+    } else {
+      clearDraft();
+    }
+  } catch(err){
+    // Corrupt or unreadable draft — ignore and start fresh rather than block loading.
+  }
+}
+
+document.querySelector('.wrap').addEventListener('input', scheduleDraftSave);
+document.querySelector('.wrap').addEventListener('change', scheduleDraftSave);
+checkForDraftOnLoad();
 </script>
 </body>
 </html>
