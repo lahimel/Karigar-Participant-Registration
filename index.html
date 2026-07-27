@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Karigar — Batch Registration Ledger</title>
+<title>Karigar: Batch Registration Ledger</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -208,6 +208,9 @@ table.ledger tr.invalid td{background:var(--rust-bg);}
 table.ledger tr.duplicate td{box-shadow: inset 3px 0 0 var(--brass);}
 table.ledger tr:nth-child(even) td:not(.invalid-cell){background-color:rgba(0,0,0,0.015);}
 .err-note{font-size:11px;color:var(--rust);padding:2px 9px 6px;font-family:system-ui,sans-serif;}
+.paid-error{font-size:12px;color:var(--rust);margin-top:2px;display:none;}
+.paid-error.show{display:block;}
+input.input-invalid{border-color:var(--rust);background:var(--rust-bg);}
 #gridErrors{
   margin-top:12px;
   font-size:13px;
@@ -289,7 +292,7 @@ table.ledger tr:nth-child(even) td:not(.invalid-cell){background-color:rgba(0,0,
 
   <section class="card" data-num="1">
     <h2 class="section-title">Course</h2>
-    <p class="section-sub">Pick the course once — it applies to the whole batch.</p>
+    <p class="section-sub">Pick the course once. It applies to the whole batch.</p>
     <div class="field-row">
       <div class="field">
         <label for="courseType">Type of Course</label>
@@ -334,7 +337,7 @@ table.ledger tr:nth-child(even) td:not(.invalid-cell){background-color:rgba(0,0,
 
   <section class="card" data-num="3">
     <h2 class="section-title">Student Details</h2>
-    <p class="section-sub">The grid below always matches "Number of Students" above — change either one and the other follows. Click the first cell, then paste your Excel block straight in.</p>
+    <p class="section-sub">The grid below always matches "Number of Students" above. Change either one and the other follows. Click the first cell, then paste your Excel block straight in.</p>
     <div class="grid-toolbar">
       <button type="button" id="addRowBtn">+ Add row</button>
       <button type="button" id="clearGridBtn">Clear grid</button>
@@ -390,6 +393,7 @@ table.ledger tr:nth-child(even) td:not(.invalid-cell){background-color:rgba(0,0,
       <div class="field narrow">
         <label for="feePaid">Amount Paid (₹)</label>
         <input type="number" id="feePaid" min="0" step="1">
+        <div class="paid-error" id="feePaidErr">Amount paid can't be more than the total fee.</div>
       </div>
       <div class="field conditional" id="payModeField">
         <label for="feePayMode">Payment Mode</label>
@@ -464,6 +468,7 @@ const els = {
   payingOrgName: document.getElementById('payingOrgName'),
   feePaidRow: document.getElementById('feePaidRow'),
   feePaid: document.getElementById('feePaid'),
+  feePaidErr: document.getElementById('feePaidErr'),
   payModeField: document.getElementById('payModeField'),
   feePayMode: document.getElementById('feePayMode'),
   paymentProofField: document.getElementById('paymentProofField'),
@@ -543,7 +548,7 @@ els.courseSelect.addEventListener('change', ()=>{
   if(!c){ els.courseInfo.classList.remove('show'); return; }
   const fee = c.fee ? ('₹' + c.fee) : 'not fixed';
   const dur = c.duration || 'not set';
-  els.courseInfo.textContent = `Duration: ${dur}   |   Typical fee: ${fee}   |   Usual batch size: ${c.batch_size || '—'}`;
+  els.courseInfo.textContent = `Duration: ${dur}   |   Typical fee: ${fee}   |   Usual batch size: ${c.batch_size || 'N/A'}`;
   els.courseInfo.classList.add('show');
 });
 
@@ -581,7 +586,7 @@ function makeCell(col){
   if(col.type==='select'){
     const sel = document.createElement('select');
     sel.dataset.key = col.key;
-    fillSelect(sel, CHOICES[col.list], '—');
+    fillSelect(sel, CHOICES[col.list], '-');
     td.appendChild(sel);
   } else {
     td.setAttribute('contenteditable','true');
@@ -795,7 +800,7 @@ function validateGrid(){
     if(!d.address) rowErrs.push('village/city area');
     if(!/^[0-9]{10}$/.test(d.mobile_number||'')) rowErrs.push('mobile (10 digits)');
     if(!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(d.email_id||'')) rowErrs.push('email');
-    if(mobileCounts[d.mobile_number] > 1) rowErrs.push('mobile repeated within this batch — check for a paste mistake');
+    if(mobileCounts[d.mobile_number] > 1) rowErrs.push('mobile repeated within this batch (possible paste mistake)');
     if(rowErrs.length){
       r.tr.classList.add('invalid');
       errors.push(`Row ${i+1}: ${rowErrs.join(', ')}`);
@@ -822,6 +827,12 @@ function computeTotals(){
   els.totStudents.textContent = n;
   els.totFee.textContent = '₹' + total.toLocaleString('en-IN');
   els.totPending.textContent = '₹' + pending.toLocaleString('en-IN');
+
+  const overpaid = paid > total;
+  els.feePaidErr.classList.toggle('show', overpaid);
+  els.feePaid.classList.toggle('input-invalid', overpaid);
+  els.feePaid.max = total > 0 ? total : '';
+  return overpaid;
 }
 
 function csvEscape(v){
@@ -867,13 +878,13 @@ async function checkDuplicates(){
         if(matchMobiles.has(mob)) tr.classList.add('duplicate');
       });
       els.dupWarnings.innerHTML = `<strong>${matches.length} number(s) already in your records:</strong><ul>${
-        matches.slice(0,15).map(m=>`<li>${m.mobile_number} — ${m.full_name||'unnamed'}${m.course_label?` (previously: ${m.course_label}${m.batch_number?', Batch '+m.batch_number:''})`:''}</li>`).join('')
-      }</ul><div>Could be a genuine repeat student, or an accidental double-entry — worth a quick look.</div>`;
+        matches.slice(0,15).map(m=>`<li>${m.mobile_number}: ${m.full_name||'unnamed'}${m.course_label?` (previously: ${m.course_label}${m.batch_number?', Batch '+m.batch_number:''})`:''}</li>`).join('')
+      }</ul><div>Could be a genuine repeat student, or an accidental double-entry. Worth a quick look.</div>`;
       els.dupWarnings.classList.add('show');
     }
     return matches;
   } catch(err){
-    return []; // soft check only — never block on a network hiccup here
+    return []; // soft check only, never block on a network hiccup here
   }
 }
 els.checkDupBtn.addEventListener('click', checkDuplicates);
@@ -894,6 +905,7 @@ function fileToBase64(file){
 async function submitBatch(){
   els.statusMsg.textContent = '';
   const gridErrors = validateGrid();
+  const overpaid = computeTotals();
   const problems = [];
 
   if(!els.courseType.value) problems.push('course type');
@@ -907,6 +919,7 @@ async function submitBatch(){
   if(!els.feePerHead.value || parseFloat(els.feePerHead.value)<=0) problems.push('fee per participant');
   if(!els.feeStatus.value) problems.push('payment status');
   if(!els.howKnow.value) problems.push('"how did you hear about us"');
+  if(overpaid) problems.push('amount paid is more than the total fee for this submission');
 
   const rows = readGridRows().map(r=>r.data).filter(d=>!isRowBlank(d));
   if(rows.length===0) problems.push('at least one student row');
@@ -930,7 +943,7 @@ async function submitBatch(){
       `Continue with registration anyway?`
     );
     if(!proceed){
-      els.statusMsg.textContent = 'Submission paused — review the highlighted rows, then submit again when ready.';
+      els.statusMsg.textContent = 'Submission paused. Review the highlighted rows, then submit again when ready.';
       els.statusMsg.style.color = 'var(--brass-dark)';
       return;
     }
@@ -994,8 +1007,8 @@ async function submitBatch(){
     const result = await resp.json();
     if(result.status === 'success'){
       const label = result.merged
-        ? `✓ Added ${result.students_saved} to existing Batch ${els.batchNumber.value} — now ${result.batch_total_students} total, ₹${Number(result.batch_pending_balance).toLocaleString('en-IN')} pending`
-        : `✓ Registered — ID ${result.registration_id}`;
+        ? `✓ Added ${result.students_saved} to existing Batch ${els.batchNumber.value}. Now ${result.batch_total_students} total, ₹${Number(result.batch_pending_balance).toLocaleString('en-IN')} pending`
+        : `✓ Registered (ID ${result.registration_id})`;
       els.statusMsg.innerHTML = `<span class="stamp">${label}</span>`;
       els.submitBtn.disabled = false;
       clearDraft();
@@ -1004,7 +1017,7 @@ async function submitBatch(){
     }
   } catch(err){
     els.statusMsg.style.color = 'var(--rust)';
-    els.statusMsg.textContent = 'Could not save: ' + err.message + ' — your data is still on this page, use "Export backup CSV" if you need to leave.';
+    els.statusMsg.textContent = 'Could not save: ' + err.message + '. Your data is still on this page, use "Export backup CSV" if you need to leave.';
     els.submitBtn.disabled = false;
   }
 }
@@ -1012,7 +1025,7 @@ async function submitBatch(){
 els.submitBtn.addEventListener('click', submitBatch);
 refreshPaymentConditionals();
 
-// ---- Draft autosave (browser local storage — this page runs outside Claude's
+// ---- Draft autosave (browser local storage; this page runs outside Claude's
 // sandbox as a normal static site, so localStorage is safe to use here) ----
 const DRAFT_KEY = 'karigar_registration_draft_v1';
 let draftSaveTimer = null;
@@ -1045,7 +1058,7 @@ function saveDraftNow(){
     };
     localStorage.setItem(DRAFT_KEY, JSON.stringify(state));
   } catch(err){
-    // Storage full/unavailable (e.g. private browsing) — fail silently.
+    // Storage full/unavailable (e.g. private browsing); fail silently.
     // "Export backup CSV" remains the safety net for the student grid itself.
   }
 }
@@ -1100,7 +1113,7 @@ function restoreDraft(state){
 
   validateGrid();
   computeTotals();
-  els.statusMsg.textContent = 'Draft restored. Note: any payment screenshot was not saved — reattach it if needed.';
+  els.statusMsg.textContent = 'Draft restored. Note: any payment screenshot was not saved; reattach it if needed.';
   els.statusMsg.style.color = 'var(--brass-dark)';
 }
 
@@ -1113,13 +1126,13 @@ function checkForDraftOnLoad(){
       (state.students && state.students.some(d=>d.first_name || d.mobile_number));
     if(!hasContent){ clearDraft(); return; }
     const when = state.savedAt ? new Date(state.savedAt).toLocaleString('en-IN') : 'earlier';
-    if(confirm(`Found an unsaved draft from ${when} — probably from a closed tab or browser crash.\n\nRestore it? (Cancel discards it and starts fresh.)`)){
+    if(confirm(`Found an unsaved draft from ${when}, probably from a closed tab or browser crash.\n\nRestore it? (Cancel discards it and starts fresh.)`)){
       restoreDraft(state);
     } else {
       clearDraft();
     }
   } catch(err){
-    // Corrupt or unreadable draft — ignore and start fresh rather than block loading.
+    // Corrupt or unreadable draft; ignore and start fresh rather than block loading.
   }
 }
 
