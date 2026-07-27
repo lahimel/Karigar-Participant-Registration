@@ -498,9 +498,32 @@ const GRID_COLS = [
   {key:'school_name', type:'text', ph:'School'},
   {key:'college_name', type:'text', ph:'College / ITI'},
   {key:'address', type:'text', ph:'Village / City'},
-  {key:'mobile_number', type:'text', ph:'10-digit mobile'},
-  {key:'email_id', type:'text', ph:'email@example.com'}
+  {key:'mobile_number', type:'text', ph:'Mobile (6-9 start)'},
+  {key:'email_id', type:'text', ph:'email@example.com (optional)'}
 ];
+
+// Indian mobile numbers: 10 digits, first digit 6-9.
+const MOBILE_RE = /^[6-9][0-9]{9}$/;
+const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+const MIN_AGE = 10;
+const MAX_AGE = 100;
+
+// Used to spot "oops, I pasted my header row too" so it can be skipped
+// instead of saved as a fake student.
+const HEADER_KEYWORDS = {
+  first_name: ['first name','first','fname'],
+  middle_name: ['middle name','middle','mname'],
+  last_name: ['last name','last','surname','lname'],
+  age: ['age'],
+  gender: ['gender','sex'],
+  current_grade: ['status','grade','current grade'],
+  student_class: ['class','std','standard'],
+  school_name: ['school','school name'],
+  college_name: ['college','college name','iti','college / iti name'],
+  address: ['village','city','address','village / city area','village/city'],
+  mobile_number: ['mobile','mobile number','phone','contact'],
+  email_id: ['email','email id','e-mail']
+};
 
 function fillSelect(sel, options, placeholder){
   sel.innerHTML = '';
@@ -560,6 +583,18 @@ function scheduleBatchNumberCheck(){
   clearTimeout(batchCheckTimer);
   batchCheckTimer = setTimeout(checkBatchNumberConflict, 400);
 }
+// Every call to the Apps Script backend goes through this, so a hung
+// server (rare, but happens) gives up after 20s instead of spinning forever.
+async function fetchWithTimeout(url, options, timeoutMs=20000){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), timeoutMs);
+  try{
+    return await fetch(url, {...options, signal: controller.signal});
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function checkBatchNumberConflict(){
   els.batchNumberErr.classList.remove('show');
   els.batchNumberErr.textContent = '';
@@ -570,7 +605,7 @@ async function checkBatchNumberConflict(){
   if(!batchNumber || !courseName || CONFIG.APPS_SCRIPT_URL.includes('PASTE_YOUR_DEPLOYED')) return null;
 
   try{
-    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
+    const resp = await fetchWithTimeout(CONFIG.APPS_SCRIPT_URL, {
       method: 'POST',
       headers: {'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify({ token: CONFIG.SECRET_TOKEN, action: 'check_batch_number', course_name: courseName, batch_number: batchNumber })
@@ -767,11 +802,30 @@ els.studentBody.addEventListener('focusin', (e)=>{
   focusCol = [...tr.children].indexOf(td) - 1; // minus rownum col
 });
 
+function rowLooksLikeHeader(cells, startColIndex){
+  let matches = 0, checked = 0;
+  cells.forEach((cellText, cOffset)=>{
+    const colIndex = startColIndex + cOffset;
+    if(colIndex < 0 || colIndex >= GRID_COLS.length) return;
+    const keywords = HEADER_KEYWORDS[GRID_COLS[colIndex].key] || [];
+    checked++;
+    if(keywords.includes((cellText||'').trim().toLowerCase())) matches++;
+  });
+  return checked > 0 && matches >= 2 && (matches / checked) >= 0.5;
+}
+
 els.studentBody.addEventListener('paste', (e)=>{
   e.preventDefault();
   const text = (e.clipboardData || window.clipboardData).getData('text');
   if(!text) return;
-  const rows = text.replace(/\r/g,'').split('\n').filter((r,i,arr)=> !(i===arr.length-1 && r===''));
+  let rows = text.replace(/\r/g,'').split('\n').filter((r,i,arr)=> !(i===arr.length-1 && r===''));
+
+  let headerSkipped = false;
+  if(rows.length && rowLooksLikeHeader(rows[0].split('\t'), focusCol)){
+    rows = rows.slice(1);
+    headerSkipped = true;
+  }
+
   rows.forEach((rowText, rOffset)=>{
     const cells = rowText.split('\t');
     const targetRowIndex = focusRow + rOffset;
@@ -790,6 +844,10 @@ els.studentBody.addEventListener('paste', (e)=>{
   }
   validateGrid();
   computeTotals();
+  if(headerSkipped){
+    els.statusMsg.style.color = 'var(--brass-dark)';
+    els.statusMsg.textContent = 'Looks like you pasted your header row too, it was skipped automatically.';
+  }
 });
 
 els.studentBody.addEventListener('input', ()=>{ validateGrid(); computeTotals(); });
@@ -799,6 +857,10 @@ function computeStudentId(first, mobile){
   const f = (first||'').replace(/[^a-zA-Z]/g,'').slice(0,3).toUpperCase();
   const m = (mobile||'').replace(/[^0-9]/g,'').slice(-5);
   return f + m;
+}
+
+function toTitleCase(str){
+  return (str||'').toLowerCase().replace(/(^|[\s'-])([a-z])/g, (m, sep, ch)=>sep+ch.toUpperCase());
 }
 
 function readGridRows(){
@@ -821,7 +883,7 @@ function validateGrid(){
   const mobileCounts = {};
   rows.forEach(r=>{
     const m = r.data.mobile_number;
-    if(/^[0-9]{10}$/.test(m||'')) mobileCounts[m] = (mobileCounts[m]||0)+1;
+    if(MOBILE_RE.test(m||'')) mobileCounts[m] = (mobileCounts[m]||0)+1;
   });
   rows.forEach((r,i)=>{
     const d = r.data;
@@ -830,15 +892,15 @@ function validateGrid(){
     const rowErrs = [];
     if(!d.first_name) rowErrs.push('first name');
     if(!d.last_name) rowErrs.push('last name');
-    if(!d.age || isNaN(parseInt(d.age)) || parseInt(d.age) < 10) rowErrs.push('age (must be 10+)');
+    if(!d.age || isNaN(parseInt(d.age)) || parseInt(d.age) < MIN_AGE || parseInt(d.age) > MAX_AGE) rowErrs.push(`age (must be ${MIN_AGE}-${MAX_AGE})`);
     if(!d.gender) rowErrs.push('gender');
     if(!d.current_grade) rowErrs.push('status');
     if(d.current_grade==='school' && !d.student_class) rowErrs.push('class');
     if(d.current_grade==='school' && !d.school_name) rowErrs.push('school name');
     if((d.current_grade==='secondary_iti'||d.current_grade==='college') && !d.college_name) rowErrs.push('college/ITI name');
     if(!d.address) rowErrs.push('village/city area');
-    if(!/^[0-9]{10}$/.test(d.mobile_number||'')) rowErrs.push('mobile (10 digits)');
-    if(!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(d.email_id||'')) rowErrs.push('email');
+    if(!MOBILE_RE.test(d.mobile_number||'')) rowErrs.push('mobile (10 digits, starting 6-9)');
+    if(d.email_id && !EMAIL_RE.test(d.email_id)) rowErrs.push('email format looks wrong');
     if(mobileCounts[d.mobile_number] > 1) rowErrs.push('mobile repeated within this batch (possible paste mistake)');
     if(rowErrs.length){
       r.tr.classList.add('invalid');
@@ -897,11 +959,11 @@ async function checkDuplicates(){
   els.dupWarnings.innerHTML = '';
 
   const rows = readGridRows().map(r=>r.data).filter(d=>!isRowBlank(d));
-  const mobiles = [...new Set(rows.map(d=>d.mobile_number).filter(m=>/^[0-9]{10}$/.test(m||'')))];
+  const mobiles = [...new Set(rows.map(d=>d.mobile_number).filter(m=>MOBILE_RE.test(m||'')))];
   if(!mobiles.length || CONFIG.APPS_SCRIPT_URL.includes('PASTE_YOUR_DEPLOYED')) return [];
 
   try{
-    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
+    const resp = await fetchWithTimeout(CONFIG.APPS_SCRIPT_URL, {
       method: 'POST',
       headers: {'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify({ token: CONFIG.SECRET_TOKEN, action: 'check_duplicates', mobiles })
@@ -1043,11 +1105,11 @@ async function submitBatch(){
       payment_proof_base64: proofBase64,
       payment_proof_filename: proofName
     },
-    students: rows.map(d=>({...d, full_name: [d.first_name,d.middle_name,d.last_name].filter(Boolean).join(' ').toUpperCase()}))
+    students: rows.map(d=>({...d, full_name: toTitleCase([d.first_name,d.middle_name,d.last_name].filter(Boolean).join(' '))}))
   };
 
   try{
-    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
+    const resp = await fetchWithTimeout(CONFIG.APPS_SCRIPT_URL, {
       method: 'POST',
       headers: {'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify(payload)
@@ -1064,8 +1126,10 @@ async function submitBatch(){
       throw new Error(result.message || 'Unknown error from server');
     }
   } catch(err){
+    const timedOut = err.name === 'AbortError';
+    const reason = timedOut ? 'Request timed out after 20 seconds, check your connection' : ('Could not save: ' + err.message);
     els.statusMsg.style.color = 'var(--rust)';
-    els.statusMsg.textContent = 'Could not save: ' + err.message + '. Your data is still on this page, use "Export backup CSV" if you need to leave.';
+    els.statusMsg.textContent = reason + '. Your data is still on this page, use "Export backup CSV" if you need to leave, then try again.';
     els.submitBtn.disabled = false;
   }
 }
