@@ -950,13 +950,11 @@ function getCellLabel(td, col){
   return td.textContent.trim();
 }
 els.exportCsvBtn.addEventListener('click', ()=>{
-  const header = ['#', ...GRID_COLS.map(c=>c.label), 'Student ID'];
+  const header = ['#', ...GRID_COLS.map(c=>c.label)];
   const lines = [header.map(csvEscape).join(',')];
   [...els.studentBody.children].forEach((tr, i)=>{
     const cells = [String(i+1)];
     GRID_COLS.forEach((col, ci)=>{ cells.push(getCellLabel(tr.children[ci+1], col)); });
-    const idTd = tr.querySelector('[data-key="student_id_preview"]');
-    cells.push(idTd ? idTd.textContent.trim() : '');
     lines.push(cells.map(csvEscape).join(','));
   });
   const blob = new Blob([lines.join('\n')], {type:'text/csv'});
