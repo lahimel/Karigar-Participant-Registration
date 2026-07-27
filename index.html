@@ -343,7 +343,7 @@ input.input-invalid{border-color:var(--rust);background:var(--rust-bg);}
       <button type="button" id="addRowBtn">+ Add row</button>
       <button type="button" id="clearGridBtn">Clear grid</button>
       <button type="button" id="checkDupBtn">Check duplicates</button>
-      <button type="button" id="exportCsvBtn">Export backup CSV</button>
+      <button type="button" id="exportCsvBtn">Export Excel template</button>
       <span class="hint" id="rowCountHint">0 rows</span>
     </div>
     <div class="grid-scroll">
@@ -434,6 +434,7 @@ input.input-invalid{border-color:var(--rust);background:var(--rust-bg);}
 
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script>
 const COURSES = [{"name": "A_Day_Karigar", "label": "A Day @ Karigar", "type": "exposure_program", "lab": "All", "duration": "1 Day", "fee": "", "batch_size": "12"}, {"name": "Karigar_Tour_Exposure_Visit", "label": "Karigar Tour / Exposure Visit", "type": "exposure_program", "lab": "All", "duration": "0.5 Day", "fee": "", "batch_size": "12"}, {"name": "Half_Day_Engagement", "label": "Half Day engagement", "type": "exposure_program", "lab": "All", "duration": "0.5 Day", "fee": "", "batch_size": "12"}, {"name": "Bagless_Days", "label": "Bagless Days", "type": "exposure_program", "lab": "All", "duration": "1 Day", "fee": "", "batch_size": "12"}, {"name": "One_Day_Carpentry_Course", "label": "One Day Carpentry Course", "type": "workshops", "lab": "Engineering", "duration": "0.5 Day", "fee": "600", "batch_size": "10"}, {"name": "One_Day_Automobile_Hacks_Workshop", "label": "One Day Automobile Hacks Workshop", "type": "workshops", "lab": "Engineering", "duration": "0.5 Day", "fee": "1000", "batch_size": "10"}, {"name": "Measurement_Skills_Tools_Techniques", "label": "Measurement Skills: Tools & Techniques", "type": "workshops", "lab": "Engineering", "duration": "0.5 Day", "fee": "3000", "batch_size": "10"}, {"name": "Fire_Safety_CPR", "label": "Fire & Safety + CPR", "type": "workshops", "lab": "Engineering", "duration": "1 Day", "fee": "2000", "batch_size": "10"}, {"name": "Cycle_Repairing_Workshop", "label": "Cycle Repairing Workshop", "type": "workshops", "lab": "Engineering", "duration": "0.5 Day", "fee": "1000", "batch_size": "10"}, {"name": "Making_Extension_Board", "label": "Making Extension Board", "type": "workshops", "lab": "Electrical", "duration": "0.5 Day", "fee": "500", "batch_size": "12"}, {"name": "Water_Purifier_Repair_Techniques", "label": "Water Purifier Repair Techniques", "type": "workshops", "lab": "Electrical", "duration": "1.5 Day", "fee": "1200", "batch_size": "8"}, {"name": "Exploring_Solar_Energy", "label": "Exploring Solar Energy", "type": "workshops", "lab": "Electrical", "duration": "0.5 Day", "fee": "500", "batch_size": "8"}, {"name": "Making_Smart_Table_Lamp", "label": "Making Smart Table Lamp", "type": "workshops", "lab": "Electrical", "duration": "0.5 Day", "fee": "800", "batch_size": "8"}, {"name": "Mechatronics_Workshop", "label": "Mechatronics Workshop", "type": "workshops", "lab": "Mechatronics", "duration": "2 Days", "fee": "1000", "batch_size": "10"}, {"name": "Terrarium_Making", "label": "Terrarium Making", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "1000", "batch_size": "10"}, {"name": "Bonsai_Making", "label": "Bonsai Making", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "1000", "batch_size": "10"}, {"name": "Miniature_Garden", "label": "Miniature Garden", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "1000", "batch_size": "10"}, {"name": "Table_Top_Garden", "label": "Table Top Garden", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "600", "batch_size": "10"}, {"name": "Compost_Making", "label": "Compost Making", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "500", "batch_size": "8"}, {"name": "Kitchen_Gardening", "label": "Kitchen Gardening", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "600", "batch_size": "8"}, {"name": "Kokedama", "label": "Kokedama", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "800", "batch_size": "10"}, {"name": "Microgreens", "label": "Microgreens", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "700", "batch_size": "10"}, {"name": "String_Lights_Seasonal", "label": "String Lights (Diwali/Ganpati/Christmas)", "type": "thematic_workshops", "lab": "Electrical", "duration": "0.5 Day", "fee": "500", "batch_size": "12"}, {"name": "Christmas_Tree_Lights_Decoration", "label": "Christmas Tree + Lights Decoration", "type": "thematic_workshops", "lab": "Electrical", "duration": "0.5 Day", "fee": "1000", "batch_size": "8"}, {"name": "Valentines_Special", "label": "Valentine's Special", "type": "thematic_workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "1000", "batch_size": "6"}, {"name": "Bento_Cake_Special", "label": "Bento Cake Special", "type": "thematic_workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "800", "batch_size": "6"}, {"name": "Cookie_Magic_Bake_Take", "label": "Cookie Magic – Bake & Take", "type": "thematic_workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "800", "batch_size": "6"}, {"name": "Flavours_of_Street_Food", "label": "Flavours of Street Food", "type": "thematic_workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "800", "batch_size": "10"}, {"name": "Diwali_Delights_Workshop", "label": "Diwali Delights Workshop", "type": "thematic_workshops", "lab": "Food_Processing", "duration": "1 Day", "fee": "1500", "batch_size": "10"}, {"name": "Christmas_Edition_Workshop", "label": "Christmas Edition Workshop", "type": "thematic_workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "800", "batch_size": "6"}, {"name": "Teachers_Training", "label": "Teachers", "type": "training", "lab": "All", "duration": "", "fee": "", "batch_size": ""}, {"name": "MSFC", "label": "MSFC", "type": "structured_courses", "lab": "All", "duration": "", "fee": "", "batch_size": ""}, {"name": "KB", "label": "KB", "type": "structured_courses", "lab": "All", "duration": "", "fee": "", "batch_size": ""}, {"name": "KV", "label": "KV", "type": "structured_courses", "lab": "All", "duration": "", "fee": "", "batch_size": ""}, {"name": "Textbooks_Customised", "label": "Textbooks (Customised Learning Programs)", "type": "structured_courses", "lab": "All", "duration": "", "fee": "", "batch_size": ""}, {"name": "Two_Wheeler_Servicing_Basic", "label": "Two Wheeler Servicing (Basic)", "type": "workshops", "lab": "Engineering", "duration": "0.5 Day", "fee": "1000", "batch_size": "10"}, {"name": "Little_Wood_Creators", "label": "Little Wood Creators", "type": "workshops", "lab": "Engineering", "duration": "0.5 Day", "fee": "2000", "batch_size": "8"}, {"name": "Basic_Woodcraft_Design", "label": "Basic - Woodcraft & Design", "type": "structured_courses", "lab": "Engineering", "duration": "2.5 Days", "fee": "3000", "batch_size": "8"}, {"name": "Intermediate_Woodcraft_Design", "label": "Intermediate - Woodcraft & Design", "type": "structured_courses", "lab": "Engineering", "duration": "5 Days", "fee": "5000", "batch_size": "8"}, {"name": "Advanced_Woodcraft_Design", "label": "Advanced- Woodcraft & Design", "type": "structured_courses", "lab": "Engineering", "duration": "36 Days", "fee": "15000", "batch_size": "8"}, {"name": "All_in_One_Serviceman_Handyman", "label": "All-in-One Serviceman (Handyman)", "type": "structured_courses", "lab": "Engineering", "duration": "144 Days", "fee": "30000", "batch_size": "10"}, {"name": "Home_Electrician_Course_Professional", "label": "Home Electrician Course (Professional & Homemakers)", "type": "structured_courses", "lab": "Electrical", "duration": "6 Days", "fee": "4200", "batch_size": "12"}, {"name": "Junior_Household_Electrician", "label": "Junior Household Electrician", "type": "structured_courses", "lab": "Electrical", "duration": "6 Days", "fee": "4000", "batch_size": "12"}, {"name": "Automation", "label": "Automation", "type": "structured_courses", "lab": "Mechatronics", "duration": "24 Days", "fee": "5000", "batch_size": "8"}, {"name": "3D_Design_Printing", "label": "3D Design & Printing", "type": "structured_courses", "lab": "Mechatronics", "duration": "6 Days", "fee": "3000", "batch_size": "8"}, {"name": "App_Development", "label": "App Development", "type": "structured_courses", "lab": "Mechatronics", "duration": "6 Days", "fee": "3000", "batch_size": "8"}, {"name": "PCB_Design", "label": "PCB Design", "type": "structured_courses", "lab": "Mechatronics", "duration": "6 Days", "fee": "3000", "batch_size": "4"}, {"name": "Robotics", "label": "Robotics", "type": "structured_courses", "lab": "Mechatronics", "duration": "8 Days", "fee": "4000", "batch_size": "8"}, {"name": "Gardening_Techniques_Intermediate", "label": "Gardening Techniques - Intermediate", "type": "structured_courses", "lab": "Agriculture", "duration": "6 Days", "fee": "4000", "batch_size": "6"}, {"name": "Gardening_Advanced", "label": "Gardening - Advanced", "type": "structured_courses", "lab": "Agriculture", "duration": "18 Days", "fee": "7500", "batch_size": "6"}, {"name": "Baking_Fundamentals", "label": "Baking Fundamentals", "type": "structured_courses", "lab": "Food_Processing", "duration": "4 Days", "fee": "2800", "batch_size": "6"}, {"name": "Junior_Bakers", "label": "Junior Bakers", "type": "workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "800", "batch_size": "6"}, {"name": "Cake_Crafting", "label": "Cake Crafting", "type": "workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "1000", "batch_size": "6"}, {"name": "Healthy_Baking", "label": "Healthy Baking", "type": "workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "800", "batch_size": "6"}, {"name": "Pizza_Frenzy", "label": "Pizza Frenzy", "type": "workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "1000", "batch_size": "6"}, {"name": "Momo_Mania", "label": "Momo Mania", "type": "workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "800", "batch_size": "10"}, {"name": "Assistant_Electrician_House_Wiring", "label": "Assistant Electrician (House Wiring)", "type": "structured_courses", "lab": "Electrical", "duration": "72 Days", "fee": "10000", "batch_size": "12"}, {"name": "Multiskill_Technician_Home_Appliances", "label": "Multiskill Technician (Home Appliances)", "type": "structured_courses", "lab": "Electrical", "duration": "72 Days", "fee": "10000", "batch_size": "12"}, {"name": "MSBSVET_Electrical_Wireman", "label": "MSBSVET Electrical Wireman", "type": "govt_certification", "lab": "Electrical", "duration": "144 Days", "fee": "15000", "batch_size": "12"}, {"name": "MSBSVET_Two_Wheeler_Servicing", "label": "MSBSVET Two Wheeler Servicing", "type": "govt_certification", "lab": "Engineering", "duration": "144 Days", "fee": "15000", "batch_size": "10"}, {"name": "Bakepreneurship", "label": "Bakepreneurship", "type": "entrepreneurship", "lab": "Food_Processing", "duration": "30 Days", "fee": "10000", "batch_size": "8"}, {"name": "Foodpreneurship", "label": "Foodpreneurship", "type": "entrepreneurship", "lab": "Food_Processing", "duration": "15 Days", "fee": "9000", "batch_size": "10"}, {"name": "Project_Based_Internship", "label": "Project-Based Internship", "type": "internship", "lab": "All", "duration": "5 Days", "fee": "2000", "batch_size": "12"}, {"name": "Service_Based_Internship", "label": "Service-Based Internship", "type": "internship", "lab": "All", "duration": "10 Days", "fee": "5000", "batch_size": "12"}, {"name": "Repair_Cafe", "label": "Repair Cafe", "type": "special_programs", "lab": "All", "duration": "0.5 Day", "fee": "200", "batch_size": "12"}, {"name": "Birthday_Celebration", "label": "Birthday Celebration", "type": "special_programs", "lab": "All", "duration": "", "fee": "", "batch_size": ""}, {"name": "Skill_Camps", "label": "Skill Camps", "type": "special_programs", "lab": "All", "duration": "7 Days", "fee": "2400", "batch_size": ""}];
 const CHOICES = {"enroll_type_list": [{"name": "individual", "label": "Individual Student", "filter": null}, {"name": "bulk", "label": "Bulk Enrollment", "filter": null}], "gender_list": [{"name": "male", "label": "Male", "filter": null}, {"name": "female", "label": "Female", "filter": null}, {"name": "other", "label": "Other", "filter": null}], "grade_list": [{"name": "school", "label": "School Student (Up to 10th)", "filter": null}, {"name": "secondary_iti", "label": "Higher Secondary / ITI / Diploma", "filter": null}, {"name": "college", "label": "College / Degree Student", "filter": null}, {"name": "working", "label": "Working / Self-Employed", "filter": null}, {"name": "dropout", "label": "Not Currently Studying / Dropout", "filter": null}], "class_list": [{"name": "5", "label": "5th Standard", "filter": null}, {"name": "6", "label": "6th Standard", "filter": null}, {"name": "7", "label": "7th Standard", "filter": null}, {"name": "8", "label": "8th Standard", "filter": null}, {"name": "9", "label": "9th Standard", "filter": null}, {"name": "10", "label": "10th Standard", "filter": null}], "pay_mode": [{"name": "cash", "label": "Cash", "filter": null}, {"name": "upi", "label": "UPI / GPay / PhonePe", "filter": null}, {"name": "card", "label": "Debit / Credit Card", "filter": null}, {"name": "bank", "label": "Cheque / Bank Transfer", "filter": null}], "lab_by_type": [{"name": "All", "label": "All Labs", "filter": "exposure_program"}, {"name": "Engineering", "label": "Engineering Lab", "filter": "workshops"}, {"name": "Electrical", "label": "Electrical Lab", "filter": "workshops"}, {"name": "Mechatronics", "label": "Mechatronics Lab", "filter": "workshops"}, {"name": "Agriculture", "label": "Agriculture Lab", "filter": "workshops"}, {"name": "Food_Processing", "label": "Food Processing Lab", "filter": "workshops"}, {"name": "Electrical", "label": "Electrical Lab", "filter": "thematic_workshops"}, {"name": "Food_Processing", "label": "Food Processing Lab", "filter": "thematic_workshops"}, {"name": "All", "label": "All Labs", "filter": "training"}, {"name": "All", "label": "All Labs", "filter": "structured_courses"}, {"name": "Engineering", "label": "Engineering Lab", "filter": "structured_courses"}, {"name": "Electrical", "label": "Electrical Lab", "filter": "structured_courses"}, {"name": "Mechatronics", "label": "Mechatronics Lab", "filter": "structured_courses"}, {"name": "Agriculture", "label": "Agriculture Lab", "filter": "structured_courses"}, {"name": "Food_Processing", "label": "Food Processing Lab", "filter": "structured_courses"}, {"name": "Electrical", "label": "Electrical Lab", "filter": "govt_certification"}, {"name": "Engineering", "label": "Engineering Lab", "filter": "govt_certification"}, {"name": "Food_Processing", "label": "Food Processing Lab", "filter": "entrepreneurship"}, {"name": "All", "label": "All Labs", "filter": "internship"}, {"name": "All", "label": "All Labs", "filter": "special_programs"}], "course_info_list": [{"name": "friend", "label": "Friend / Family (Referral)", "filter": null}, {"name": "org", "label": "Organization / Institution (Referral)", "filter": null}, {"name": "colleague", "label": "Colleague (Referral)", "filter": null}, {"name": "social_media", "label": "Social Media", "filter": null}, {"name": "website", "label": "Website", "filter": null}, {"name": "ad", "label": "Advertisement", "filter": null}, {"name": "other", "label": "Other (please specify)", "filter": null}, {"name": "no", "label": "Not Applicable", "filter": null}], "status_list": [{"name": "full", "label": "Full Paid", "filter": null}, {"name": "partial", "label": "Partial Paid", "filter": null}, {"name": "school_pay", "label": "School Payment", "filter": null}, {"name": "org_pay", "label": "Organization Payment", "filter": null}, {"name": "not_paid", "label": "Not Paid", "filter": null}, {"name": "na", "label": "Not Applicable / Scholarship", "filter": null}], "course_type_list": [{"name": "exposure_program", "label": "Exposure Program", "filter": null}, {"name": "workshops", "label": "Workshops", "filter": null}, {"name": "thematic_workshops", "label": "Thematic Workshops", "filter": null}, {"name": "training", "label": "Training", "filter": null}, {"name": "structured_courses", "label": "Structured Courses", "filter": null}, {"name": "govt_certification", "label": "Govt. Certification Programs", "filter": null}, {"name": "entrepreneurship", "label": "Entrepreneurship", "filter": null}, {"name": "internship", "label": "Internship", "filter": null}, {"name": "special_programs", "label": "Special Programs", "filter": null}]};
@@ -936,11 +937,6 @@ function computeTotals(){
   return overpaid;
 }
 
-function csvEscape(v){
-  v = String(v==null?'':v);
-  if(/[",\n]/.test(v)) return '"' + v.replace(/"/g,'""') + '"';
-  return v;
-}
 function getCellLabel(td, col){
   if(col.type==='select'){
     const sel = td.querySelector('select');
@@ -949,19 +945,67 @@ function getCellLabel(td, col){
   }
   return td.textContent.trim();
 }
-els.exportCsvBtn.addEventListener('click', ()=>{
-  const header = ['#', ...GRID_COLS.map(c=>c.label)];
-  const lines = [header.map(csvEscape).join(',')];
-  [...els.studentBody.children].forEach((tr, i)=>{
-    const cells = [String(i+1)];
-    GRID_COLS.forEach((col, ci)=>{ cells.push(getCellLabel(tr.children[ci+1], col)); });
-    lines.push(cells.map(csvEscape).join(','));
+
+// A quoted, comma-separated list for Excel's inline dropdown validation.
+// Excel's inline list source has a 255-character limit, so long option
+// sets (like grade_list) still work here since none of our labels are close to that.
+function excelListFormula(listName){
+  const labels = (CHOICES[listName]||[]).map(o=>o.label);
+  return '"' + labels.join(',') + '"';
+}
+
+const TEMPLATE_EXTRA_BLANK_ROWS = 150; // room to keep filling this template offline, beyond whatever's on screen right now
+
+els.exportCsvBtn.addEventListener('click', async ()=>{
+  if(typeof ExcelJS === 'undefined'){
+    els.statusMsg.style.color = 'var(--rust)';
+    els.statusMsg.textContent = 'Could not load the Excel library (needs an internet connection once, to fetch it). Try again when online.';
+    return;
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Students');
+
+  const headerLabels = ['#', ...GRID_COLS.map(c=>c.label)];
+  sheet.addRow(headerLabels);
+  sheet.getRow(1).font = { bold: true };
+  sheet.columns = headerLabels.map(()=>({ width: 20 }));
+
+  const existingRows = [...els.studentBody.children];
+  const totalRows = existingRows.length + TEMPLATE_EXTRA_BLANK_ROWS;
+
+  for(let i=0; i<totalRows; i++){
+    const tr = existingRows[i];
+    const rowValues = [i+1];
+    GRID_COLS.forEach((col, ci)=>{
+      rowValues.push(tr ? getCellLabel(tr.children[ci+1], col) : '');
+    });
+    sheet.addRow(rowValues);
+  }
+
+  // Real dropdowns: Gender, Status, and Class columns, for every row (including the blank ones).
+  const dropdownCols = ['gender','current_grade','student_class'];
+  dropdownCols.forEach(key=>{
+    const colIndex = GRID_COLS.findIndex(c=>c.key===key); // 0-based within GRID_COLS
+    if(colIndex === -1) return;
+    const excelCol = colIndex + 2; // +1 for the '#' column, +1 because Excel columns are 1-indexed
+    const formula = excelListFormula(GRID_COLS[colIndex].list);
+    for(let r=2; r<=totalRows+1; r++){
+      sheet.getCell(r, excelCol).dataValidation = { type:'list', allowBlank:true, formulae:[formula] };
+    }
   });
-  const blob = new Blob([lines.join('\n')], {type:'text/csv'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `karigar_batch_backup_${Date.now()}.csv`;
-  a.click();
+
+  try{
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `karigar_batch_template_${Date.now()}.xlsx`;
+    a.click();
+  } catch(err){
+    els.statusMsg.style.color = 'var(--rust)';
+    els.statusMsg.textContent = 'Could not build the Excel file: ' + err.message;
+  }
 });
 
 // ---- Duplicate check against everything already saved on the server ----
@@ -1141,7 +1185,7 @@ async function submitBatch(){
     const timedOut = err.name === 'AbortError';
     const reason = timedOut ? 'Request timed out after 20 seconds, check your connection' : ('Could not save: ' + err.message);
     els.statusMsg.style.color = 'var(--rust)';
-    els.statusMsg.textContent = reason + '. Your data is still on this page, use "Export backup CSV" if you need to leave, then try again.';
+    els.statusMsg.textContent = reason + '. Your data is still on this page, use "Export Excel template" if you need to leave, then try again.';
     els.submitBtn.disabled = false;
   }
 }
@@ -1183,7 +1227,7 @@ function saveDraftNow(){
     localStorage.setItem(DRAFT_KEY, JSON.stringify(state));
   } catch(err){
     // Storage full/unavailable (e.g. private browsing); fail silently.
-    // "Export backup CSV" remains the safety net for the student grid itself.
+    // "Export Excel template" remains the safety net for the student grid itself.
   }
 }
 
