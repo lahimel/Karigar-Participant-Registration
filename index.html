@@ -423,7 +423,7 @@ const CHOICES = {"enroll_type_list": [{"name": "individual", "label": "Individua
 
 // ---- CONFIG: fill these in after you deploy the Apps Script web app ----
 const CONFIG = {
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwaKwTpG7GphyBM92BJJudBWdeiBNoX7KWIoX7bJDTmkwiuU7zNUH4CkLUgXpQSkkca/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxcfBYPy5icC9SxhHRdnTgey1rsldIoONlK-Z6nCp_2MGFbCxULbh5ZOXUjVh3snV5w/exec",
   SECRET_TOKEN: "AjAYME31Z5dgntu60g34"
 };
 // --------------------------------------------------------------------
@@ -862,7 +862,10 @@ async function submitBatch(){
     });
     const result = await resp.json();
     if(result.status === 'success'){
-      els.statusMsg.innerHTML = `<span class="stamp">✓ Registered — ID ${result.registration_id}</span>`;
+      const label = result.merged
+        ? `✓ Added ${result.students_saved} to existing Batch ${els.batchNumber.value} — now ${result.batch_total_students} total, ₹${Number(result.batch_pending_balance).toLocaleString('en-IN')} pending`
+        : `✓ Registered — ID ${result.registration_id}`;
+      els.statusMsg.innerHTML = `<span class="stamp">${label}</span>`;
       els.submitBtn.disabled = false;
     } else {
       throw new Error(result.message || 'Unknown error from server');
