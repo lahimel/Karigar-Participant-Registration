@@ -269,7 +269,6 @@ table.ledger tr:nth-child(even) td:not(.invalid-cell){background-color:rgba(0,0,
 <header class="top">
   <div class="wrap">
     <div class="brand">Karigar<small>Batch Registration Ledger</small></div>
-    <div class="top-note">Paste from Excel · Writes straight to your Sheet</div>
   </div>
 </header>
 
@@ -317,15 +316,12 @@ table.ledger tr:nth-child(even) td:not(.invalid-cell){background-color:rgba(0,0,
         <label for="numStudents">Number of Students</label>
         <input type="number" id="numStudents" min="1" max="100" step="1">
       </div>
-      <div class="field" style="align-self:flex-end;">
-        <button type="button" id="matchRowsBtn">Set grid rows to match</button>
-      </div>
     </div>
   </section>
 
   <section class="card" data-num="3">
     <h2 class="section-title">Student Details</h2>
-    <p class="section-sub">Click the first cell, then paste your Excel block straight in — it fills across and down automatically.</p>
+    <p class="section-sub">The grid below always matches "Number of Students" above — change either one and the other follows. Click the first cell, then paste your Excel block straight in.</p>
     <div class="grid-toolbar">
       <button type="button" id="addRowBtn">+ Add row</button>
       <button type="button" id="clearGridBtn">Clear grid</button>
@@ -412,6 +408,7 @@ table.ledger tr:nth-child(even) td:not(.invalid-cell){background-color:rgba(0,0,
 
   <div class="submit-bar">
     <span id="statusMsg"></span>
+    <button type="button" id="resetBtn">Reset form</button>
     <button type="button" class="primary" id="submitBtn">Register batch</button>
   </div>
 
@@ -423,7 +420,7 @@ const CHOICES = {"enroll_type_list": [{"name": "individual", "label": "Individua
 
 // ---- CONFIG: fill these in after you deploy the Apps Script web app ----
 const CONFIG = {
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxcfBYPy5icC9SxhHRdnTgey1rsldIoONlK-Z6nCp_2MGFbCxULbh5ZOXUjVh3snV5w/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwaKwTpG7GphyBM92BJJudBWdeiBNoX7KWIoX7bJDTmkwiuU7zNUH4CkLUgXpQSkkca/exec",
   SECRET_TOKEN: "AjAYME31Z5dgntu60g34"
 };
 // --------------------------------------------------------------------
@@ -437,7 +434,7 @@ const els = {
   courseEndDate: document.getElementById('courseEndDate'),
   batchNumber: document.getElementById('batchNumber'),
   numStudents: document.getElementById('numStudents'),
-  matchRowsBtn: document.getElementById('matchRowsBtn'),
+  resetBtn: document.getElementById('resetBtn'),
   studentBody: document.getElementById('studentBody'),
   addRowBtn: document.getElementById('addRowBtn'),
   clearGridBtn: document.getElementById('clearGridBtn'),
@@ -600,19 +597,72 @@ function renumberRows(){
 function clearGrid(){
   els.studentBody.innerHTML='';
   addRow();
+  els.numStudents.value = 1;
 }
 
-els.addRowBtn.addEventListener('click', ()=>addRow());
+function trIsBlank(tr){
+  const d = {};
+  GRID_COLS.forEach((col,i)=>{ d[col.key] = getCellValue(tr.children[i+1], col); });
+  return isRowBlank(d);
+}
+
+// Number of Students -> grid: typing a count grows the grid to match.
+// Shrinking only removes trailing rows that are still blank, so typed data is never lost silently.
+function syncGridToCount(){
+  const n = parseInt(els.numStudents.value)||0;
+  if(n<=0) return;
+  const current = els.studentBody.children.length;
+  if(n > current){
+    for(let i=current;i<n;i++) addRow();
+  } else if(n < current){
+    let removable = 0;
+    for(let i=current-1;i>=n;i--){
+      if(trIsBlank(els.studentBody.children[i])) removable++;
+      else break;
+    }
+    for(let i=0;i<removable;i++) els.studentBody.removeChild(els.studentBody.lastElementChild);
+  }
+  renumberRows();
+  validateGrid();
+  computeTotals();
+}
+els.numStudents.addEventListener('input', syncGridToCount);
+
+// Grid -> Number of Students: adding a row bumps the declared count to match.
+els.addRowBtn.addEventListener('click', ()=>{
+  addRow();
+  els.numStudents.value = els.studentBody.children.length;
+});
 els.clearGridBtn.addEventListener('click', ()=>{
   if(confirm('Clear all pasted student rows?')) clearGrid();
 });
-els.matchRowsBtn.addEventListener('click', ()=>{
-  const n = parseInt(els.numStudents.value)||0;
-  if(n<=0){ alert('Enter number of students first.'); return; }
-  const current = els.studentBody.children.length;
-  for(let i=current;i<n;i++) addRow();
-  renumberRows();
-});
+
+function resetForm(){
+  if(!confirm('Reset the whole form? Everything entered so far will be cleared.')) return;
+  els.courseType.value = '';
+  els.courseType.dispatchEvent(new Event('change'));
+  els.enrollDate.value = '';
+  els.courseEndDate.value = '';
+  els.batchNumber.value = '';
+  els.numStudents.value = '';
+  els.studentBody.innerHTML = '';
+  addRow();
+  els.gridErrors.classList.remove('show');
+  els.feePerHead.value = '';
+  els.feeStatus.value = '';
+  els.feeStatus.dispatchEvent(new Event('change'));
+  els.payingOrgName.value = '';
+  els.feePaid.value = '';
+  els.feePayMode.value = '';
+  els.paymentProof.value = '';
+  els.howKnow.value = '';
+  els.howKnow.dispatchEvent(new Event('change'));
+  els.referralName.value = '';
+  els.otherSpecify.value = '';
+  computeTotals();
+  els.statusMsg.textContent = '';
+}
+els.resetBtn.addEventListener('click', resetForm);
 
 function fuzzyMatchOption(list, text){
   if(!text) return '';
@@ -673,6 +723,9 @@ els.studentBody.addEventListener('paste', (e)=>{
     });
   });
   renumberRows();
+  if(els.studentBody.children.length > (parseInt(els.numStudents.value)||0)){
+    els.numStudents.value = els.studentBody.children.length;
+  }
   validateGrid();
   computeTotals();
 });
@@ -764,7 +817,7 @@ els.exportCsvBtn.addEventListener('click', ()=>{
 });
 
 // init grid with a few blank rows
-for(let i=0;i<3;i++) addRow();
+addRow();
 
 // ---- Submit ----
 function fileToBase64(file){
