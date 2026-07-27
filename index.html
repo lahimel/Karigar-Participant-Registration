@@ -327,6 +327,7 @@ input.input-invalid{border-color:var(--rust);background:var(--rust-bg);}
       <div class="field narrow">
         <label for="batchNumber">Batch Number</label>
         <input type="number" id="batchNumber" min="1" step="1">
+        <div class="paid-error" id="batchNumberErr"></div>
       </div>
       <div class="field narrow">
         <label for="numStudents">Number of Students</label>
@@ -452,6 +453,7 @@ const els = {
   enrollDate: document.getElementById('enrollDate'),
   courseEndDate: document.getElementById('courseEndDate'),
   batchNumber: document.getElementById('batchNumber'),
+  batchNumberErr: document.getElementById('batchNumberErr'),
   numStudents: document.getElementById('numStudents'),
   resetBtn: document.getElementById('resetBtn'),
   studentBody: document.getElementById('studentBody'),
@@ -551,6 +553,43 @@ els.courseSelect.addEventListener('change', ()=>{
   els.courseInfo.textContent = `Duration: ${dur}   |   Typical fee: ${fee}   |   Usual batch size: ${c.batch_size || 'N/A'}`;
   els.courseInfo.classList.add('show');
 });
+
+// ---- Batch number uniqueness (a batch number belongs to exactly one course) ----
+let batchCheckTimer = null;
+function scheduleBatchNumberCheck(){
+  clearTimeout(batchCheckTimer);
+  batchCheckTimer = setTimeout(checkBatchNumberConflict, 400);
+}
+async function checkBatchNumberConflict(){
+  els.batchNumberErr.classList.remove('show');
+  els.batchNumberErr.textContent = '';
+  els.batchNumber.classList.remove('input-invalid');
+
+  const batchNumber = els.batchNumber.value;
+  const courseName = els.courseSelect.value;
+  if(!batchNumber || !courseName || CONFIG.APPS_SCRIPT_URL.includes('PASTE_YOUR_DEPLOYED')) return null;
+
+  try{
+    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({ token: CONFIG.SECRET_TOKEN, action: 'check_batch_number', course_name: courseName, batch_number: batchNumber })
+    });
+    const result = await resp.json();
+    if(result.status !== 'success') return null;
+    if(result.conflict){
+      els.batchNumberErr.textContent = `Batch ${batchNumber} is already used for "${result.conflict.course_label}". Batch numbers must be unique across every course.`;
+      els.batchNumberErr.classList.add('show');
+      els.batchNumber.classList.add('input-invalid');
+      return result.conflict;
+    }
+    return null;
+  } catch(err){
+    return null; // soft check only, never block on a network hiccup here
+  }
+}
+els.batchNumber.addEventListener('input', scheduleBatchNumberCheck);
+els.courseSelect.addEventListener('change', scheduleBatchNumberCheck);
 
 // ---- Payment conditionals ----
 function refreshPaymentConditionals(){
@@ -929,6 +968,15 @@ async function submitBatch(){
 
   if(problems.length){
     els.statusMsg.textContent = 'Fix before submitting: ' + problems.join('; ');
+    els.statusMsg.style.color = 'var(--rust)';
+    return;
+  }
+
+  els.statusMsg.style.color = 'var(--ink-soft)';
+  els.statusMsg.textContent = 'Checking batch number…';
+  const batchConflict = await checkBatchNumberConflict();
+  if(batchConflict){
+    els.statusMsg.textContent = `Batch ${els.batchNumber.value} is already used for "${batchConflict.course_label}". Choose a different batch number, or select that course instead.`;
     els.statusMsg.style.color = 'var(--rust)';
     return;
   }
