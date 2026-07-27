@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Karigar — Batch Registration Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F6F1;
+  --surface:#FFFFFF;
+  --ink:#1F2A24;
+  --ink-soft:#5B6B62;
+  --line:#DCE1D8;
+  --brass:#A9782E;
+  --brass-dark:#8A611F;
+  --teal:#3D6B63;
+  --rust:#B23A2A;
+  --rust-bg:#FBEAE6;
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  line-height:1.45;
+  padding-bottom:80px;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px;}
+header.top{
+  border-bottom:2px solid var(--ink);
+  padding:28px 0 20px;
+  margin-bottom:8px;
+}
+header.top .wrap{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.brand{
+  font-family:"Space Grotesk",system-ui,sans-serif;
+  font-weight:700;
+  font-size:26px;
+  letter-spacing:-0.02em;
+}
+.brand small{
+  display:block;
+  font-family:"IBM Plex Mono",monospace;
+  font-weight:500;
+  font-size:11px;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:var(--brass-dark);
+  margin-top:4px;
+}
+.top-note{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:12px;
+  color:var(--ink-soft);
+  text-align:right;
+}
+section.card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:2px;
+  margin:20px 0;
+  position:relative;
+  padding:26px 28px 28px 74px;
+}
+section.card::before{
+  content:attr(data-num);
+  position:absolute;
+  left:0;top:0;bottom:0;
+  width:52px;
+  background:var(--ink);
+  color:var(--bg);
+  font-family:"IBM Plex Mono",monospace;
+  font-weight:600;
+  font-size:20px;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  padding-top:26px;
+}
+h2.section-title{
+  font-family:"Space Grotesk",system-ui,sans-serif;
+  font-size:19px;
+  font-weight:700;
+  margin:0 0 4px;
+  letter-spacing:-0.01em;
+}
+p.section-sub{
+  margin:0 0 18px;
+  font-size:13px;
+  color:var(--ink-soft);
+}
+.field-row{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:14px;}
+.field{flex:1;min-width:200px;display:flex;flex-direction:column;gap:6px;}
+.field.narrow{max-width:180px;flex:0 0 auto;}
+label{
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:0.06em;
+  text-transform:uppercase;
+  color:var(--ink-soft);
+}
+input, select, textarea{
+  font-family:system-ui,-apple-system,sans-serif;
+  font-size:14.5px;
+  padding:9px 10px;
+  border:1px solid var(--line);
+  border-radius:3px;
+  background:#fff;
+  color:var(--ink);
+}
+input:focus, select:focus, textarea:focus, td[contenteditable]:focus{
+  outline:2px solid var(--brass);
+  outline-offset:1px;
+  border-color:var(--brass);
+}
+.info-line{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:13px;
+  background:#F1EBDD;
+  border:1px dashed var(--brass);
+  color:var(--brass-dark);
+  padding:8px 12px;
+  border-radius:3px;
+  margin-top:2px;
+  display:none;
+}
+.info-line.show{display:block;}
+.grid-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+button{
+  font-family:system-ui,sans-serif;
+  font-size:13.5px;
+  font-weight:600;
+  padding:9px 16px;
+  border-radius:3px;
+  border:1px solid var(--ink);
+  background:var(--surface);
+  color:var(--ink);
+  cursor:pointer;
+}
+button:hover{background:#F0F0EC;}
+button.primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+button.primary:hover{background:#33463B;}
+button.brass{background:var(--brass);color:#fff;border-color:var(--brass-dark);}
+button.brass:hover{background:var(--brass-dark);}
+button:disabled{opacity:0.5;cursor:not-allowed;}
+.hint{font-size:12px;color:var(--ink-soft);font-family:"IBM Plex Mono",monospace;}
+.grid-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:3px;}
+table.ledger{
+  border-collapse:collapse;
+  width:100%;
+  font-family:"IBM Plex Mono",monospace;
+  font-size:13px;
+  min-width:1200px;
+}
+table.ledger th{
+  background:var(--ink);
+  color:var(--bg);
+  font-weight:500;
+  text-align:left;
+  padding:8px 10px;
+  font-size:11px;
+  letter-spacing:0.04em;
+  text-transform:uppercase;
+  position:sticky;top:0;
+  white-space:nowrap;
+}
+table.ledger td{
+  border-bottom:1px solid var(--line);
+  border-right:1px solid var(--line);
+  padding:0;
+  vertical-align:top;
+}
+table.ledger td.rownum{
+  background:#F1F2EE;
+  color:var(--ink-soft);
+  text-align:center;
+  padding:8px 6px;
+  font-weight:600;
+  user-select:none;
+}
+table.ledger td[contenteditable]{
+  padding:7px 9px;
+  min-width:90px;
+  outline-offset:-2px;
+}
+table.ledger td[contenteditable]:empty::before{
+  content:attr(data-ph);
+  color:#B9BFB4;
+}
+table.ledger td select{
+  width:100%;
+  border:none;
+  background:transparent;
+  padding:7px 6px;
+  font-family:"IBM Plex Mono",monospace;
+  font-size:13px;
+}
+table.ledger td.readonly{
+  background:#FAFAF6;
+  color:var(--ink-soft);
+  padding:7px 9px;
+}
+table.ledger tr.invalid td{background:var(--rust-bg);}
+table.ledger tr:nth-child(even) td:not(.invalid-cell){background-color:rgba(0,0,0,0.015);}
+.err-note{font-size:11px;color:var(--rust);padding:2px 9px 6px;font-family:system-ui,sans-serif;}
+#gridErrors{
+  margin-top:12px;
+  font-size:13px;
+  color:var(--rust);
+  background:var(--rust-bg);
+  border:1px solid var(--rust);
+  border-radius:3px;
+  padding:10px 14px;
+  display:none;
+}
+#gridErrors.show{display:block;}
+#gridErrors ul{margin:6px 0 0;padding-left:18px;}
+.totals{
+  display:flex;
+  gap:28px;
+  flex-wrap:wrap;
+  margin-top:16px;
+  padding-top:16px;
+  border-top:1px dashed var(--line);
+}
+.total-box{font-family:"IBM Plex Mono",monospace;}
+.total-box .lbl{font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);display:block;}
+.total-box .val{font-size:20px;font-weight:600;color:var(--teal);}
+.submit-bar{
+  position:sticky;
+  bottom:0;
+  background:var(--bg);
+  border-top:2px solid var(--ink);
+  padding:16px 0;
+  margin-top:24px;
+  display:flex;
+  justify-content:flex-end;
+  gap:12px;
+  align-items:center;
+}
+#statusMsg{font-size:13px;font-family:"IBM Plex Mono",monospace;}
+.stamp{
+  display:inline-block;
+  border:3px solid var(--teal);
+  color:var(--teal);
+  font-family:"Space Grotesk",sans-serif;
+  font-weight:700;
+  font-size:15px;
+  padding:8px 16px;
+  border-radius:4px;
+  transform:rotate(-3deg);
+  letter-spacing:0.04em;
+}
+.hidden{display:none !important;}
+.conditional{display:none;}
+.conditional.show{display:flex;}
+@media (max-width:720px){
+  section.card{padding:22px 16px 24px 54px;}
+  section.card::before{width:38px;font-size:16px;padding-top:22px;}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">Karigar<small>Batch Registration Ledger</small></div>
+    <div class="top-note">Paste from Excel · Writes straight to your Sheet</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section class="card" data-num="1">
+    <h2 class="section-title">Course</h2>
+    <p class="section-sub">Pick the course once — it applies to the whole batch.</p>
+    <div class="field-row">
+      <div class="field">
+        <label for="courseType">Type of Course</label>
+        <select id="courseType"><option value="">Select…</option></select>
+      </div>
+      <div class="field">
+        <label for="labCenter">Training Center</label>
+        <select id="labCenter" disabled><option value="">Select course type first</option></select>
+      </div>
+      <div class="field">
+        <label for="courseSelect">Course</label>
+        <select id="courseSelect" disabled><option value="">Select training center first</option></select>
+      </div>
+    </div>
+    <div class="info-line" id="courseInfo"></div>
+    <div class="field-row" style="margin-top:16px;">
+      <div class="field narrow">
+        <label for="enrollDate">Course Start Date</label>
+        <input type="date" id="enrollDate">
+      </div>
+      <div class="field narrow">
+        <label for="courseEndDate">Course End Date</label>
+        <input type="date" id="courseEndDate">
+      </div>
+    </div>
+  </section>
+
+  <section class="card" data-num="2">
+    <h2 class="section-title">Batch &amp; Count</h2>
+    <p class="section-sub">Batch number and how many students you're registering.</p>
+    <div class="field-row">
+      <div class="field narrow">
+        <label for="batchNumber">Batch Number</label>
+        <input type="number" id="batchNumber" min="1" step="1">
+      </div>
+      <div class="field narrow">
+        <label for="numStudents">Number of Students</label>
+        <input type="number" id="numStudents" min="1" max="100" step="1">
+      </div>
+      <div class="field" style="align-self:flex-end;">
+        <button type="button" id="matchRowsBtn">Set grid rows to match</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" data-num="3">
+    <h2 class="section-title">Student Details</h2>
+    <p class="section-sub">Click the first cell, then paste your Excel block straight in — it fills across and down automatically.</p>
+    <div class="grid-toolbar">
+      <button type="button" id="addRowBtn">+ Add row</button>
+      <button type="button" id="clearGridBtn">Clear grid</button>
+      <button type="button" id="exportCsvBtn">Export backup CSV</button>
+      <span class="hint" id="rowCountHint">0 rows</span>
+    </div>
+    <div class="grid-scroll">
+      <table class="ledger" id="studentGrid">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>First Name</th>
+            <th>Middle Name</th>
+            <th>Last Name</th>
+            <th>Age</th>
+            <th>Gender</th>
+            <th>Status</th>
+            <th>Class</th>
+            <th>School Name</th>
+            <th>College / ITI Name</th>
+            <th>Village / City Area</th>
+            <th>Mobile Number</th>
+            <th>Email ID</th>
+            <th>Student ID</th>
+          </tr>
+        </thead>
+        <tbody id="studentBody"></tbody>
+      </table>
+    </div>
+    <div id="gridErrors"></div>
+  </section>
+
+  <section class="card" data-num="4">
+    <h2 class="section-title">Payment Details</h2>
+    <p class="section-sub">Fee terms for the whole batch.</p>
+    <div class="field-row">
+      <div class="field narrow">
+        <label for="feePerHead">Agreed Fee / Participant (₹)</label>
+        <input type="number" id="feePerHead" min="1" step="1">
+      </div>
+      <div class="field">
+        <label for="feeStatus">Payment Status</label>
+        <select id="feeStatus"><option value="">Select…</option></select>
+      </div>
+      <div class="field conditional" id="payingOrgField">
+        <label for="payingOrgName">Name of School / Organization</label>
+        <input type="text" id="payingOrgName">
+      </div>
+    </div>
+    <div class="field-row conditional" id="feePaidRow">
+      <div class="field narrow">
+        <label for="feePaid">Amount Paid (₹)</label>
+        <input type="number" id="feePaid" min="0" step="1">
+      </div>
+      <div class="field conditional" id="payModeField">
+        <label for="feePayMode">Payment Mode</label>
+        <select id="feePayMode"><option value="">Select…</option></select>
+      </div>
+      <div class="field conditional" id="paymentProofField">
+        <label for="paymentProof">Payment Screenshot</label>
+        <input type="file" id="paymentProof" accept="image/*">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="howKnow">How did you hear about us?</label>
+        <select id="howKnow"><option value="">Select…</option></select>
+      </div>
+      <div class="field conditional" id="referralField">
+        <label for="referralName">Referral Name</label>
+        <input type="text" id="referralName">
+      </div>
+      <div class="field conditional" id="otherSpecifyField">
+        <label for="otherSpecify">Please specify</label>
+        <input type="text" id="otherSpecify">
+      </div>
+    </div>
+    <div class="totals">
+      <div class="total-box"><span class="lbl">Total students</span><span class="val" id="totStudents">0</span></div>
+      <div class="total-box"><span class="lbl">Total fee</span><span class="val" id="totFee">₹0</span></div>
+      <div class="total-box"><span class="lbl">Pending balance</span><span class="val" id="totPending">₹0</span></div>
+    </div>
+  </section>
+
+  <div class="submit-bar">
+    <span id="statusMsg"></span>
+    <button type="button" class="primary" id="submitBtn">Register batch</button>
+  </div>
+
+</div>
+
+<script>
+const COURSES = [{"name": "A_Day_Karigar", "label": "A Day @ Karigar", "type": "exposure_program", "lab": "All", "duration": "1 Day", "fee": "", "batch_size": "12"}, {"name": "Karigar_Tour_Exposure_Visit", "label": "Karigar Tour / Exposure Visit", "type": "exposure_program", "lab": "All", "duration": "0.5 Day", "fee": "", "batch_size": "12"}, {"name": "Half_Day_Engagement", "label": "Half Day engagement", "type": "exposure_program", "lab": "All", "duration": "0.5 Day", "fee": "", "batch_size": "12"}, {"name": "Bagless_Days", "label": "Bagless Days", "type": "exposure_program", "lab": "All", "duration": "1 Day", "fee": "", "batch_size": "12"}, {"name": "One_Day_Carpentry_Course", "label": "One Day Carpentry Course", "type": "workshops", "lab": "Engineering", "duration": "0.5 Day", "fee": "600", "batch_size": "10"}, {"name": "One_Day_Automobile_Hacks_Workshop", "label": "One Day Automobile Hacks Workshop", "type": "workshops", "lab": "Engineering", "duration": "0.5 Day", "fee": "1000", "batch_size": "10"}, {"name": "Measurement_Skills_Tools_Techniques", "label": "Measurement Skills: Tools & Techniques", "type": "workshops", "lab": "Engineering", "duration": "0.5 Day", "fee": "3000", "batch_size": "10"}, {"name": "Fire_Safety_CPR", "label": "Fire & Safety + CPR", "type": "workshops", "lab": "Engineering", "duration": "1 Day", "fee": "2000", "batch_size": "10"}, {"name": "Cycle_Repairing_Workshop", "label": "Cycle Repairing Workshop", "type": "workshops", "lab": "Engineering", "duration": "0.5 Day", "fee": "1000", "batch_size": "10"}, {"name": "Making_Extension_Board", "label": "Making Extension Board", "type": "workshops", "lab": "Electrical", "duration": "0.5 Day", "fee": "500", "batch_size": "12"}, {"name": "Water_Purifier_Repair_Techniques", "label": "Water Purifier Repair Techniques", "type": "workshops", "lab": "Electrical", "duration": "1.5 Day", "fee": "1200", "batch_size": "8"}, {"name": "Exploring_Solar_Energy", "label": "Exploring Solar Energy", "type": "workshops", "lab": "Electrical", "duration": "0.5 Day", "fee": "500", "batch_size": "8"}, {"name": "Making_Smart_Table_Lamp", "label": "Making Smart Table Lamp", "type": "workshops", "lab": "Electrical", "duration": "0.5 Day", "fee": "800", "batch_size": "8"}, {"name": "Mechatronics_Workshop", "label": "Mechatronics Workshop", "type": "workshops", "lab": "Mechatronics", "duration": "2 Days", "fee": "1000", "batch_size": "10"}, {"name": "Terrarium_Making", "label": "Terrarium Making", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "1000", "batch_size": "10"}, {"name": "Bonsai_Making", "label": "Bonsai Making", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "1000", "batch_size": "10"}, {"name": "Miniature_Garden", "label": "Miniature Garden", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "1000", "batch_size": "10"}, {"name": "Table_Top_Garden", "label": "Table Top Garden", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "600", "batch_size": "10"}, {"name": "Compost_Making", "label": "Compost Making", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "500", "batch_size": "8"}, {"name": "Kitchen_Gardening", "label": "Kitchen Gardening", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "600", "batch_size": "8"}, {"name": "Kokedama", "label": "Kokedama", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "800", "batch_size": "10"}, {"name": "Microgreens", "label": "Microgreens", "type": "workshops", "lab": "Agriculture", "duration": "0.5 Day", "fee": "700", "batch_size": "10"}, {"name": "String_Lights_Seasonal", "label": "String Lights (Diwali/Ganpati/Christmas)", "type": "thematic_workshops", "lab": "Electrical", "duration": "0.5 Day", "fee": "500", "batch_size": "12"}, {"name": "Christmas_Tree_Lights_Decoration", "label": "Christmas Tree + Lights Decoration", "type": "thematic_workshops", "lab": "Electrical", "duration": "0.5 Day", "fee": "1000", "batch_size": "8"}, {"name": "Valentines_Special", "label": "Valentine's Special", "type": "thematic_workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "1000", "batch_size": "6"}, {"name": "Bento_Cake_Special", "label": "Bento Cake Special", "type": "thematic_workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "800", "batch_size": "6"}, {"name": "Cookie_Magic_Bake_Take", "label": "Cookie Magic – Bake & Take", "type": "thematic_workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "800", "batch_size": "6"}, {"name": "Flavours_of_Street_Food", "label": "Flavours of Street Food", "type": "thematic_workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "800", "batch_size": "10"}, {"name": "Diwali_Delights_Workshop", "label": "Diwali Delights Workshop", "type": "thematic_workshops", "lab": "Food_Processing", "duration": "1 Day", "fee": "1500", "batch_size": "10"}, {"name": "Christmas_Edition_Workshop", "label": "Christmas Edition Workshop", "type": "thematic_workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "800", "batch_size": "6"}, {"name": "Teachers_Training", "label": "Teachers", "type": "training", "lab": "All", "duration": "", "fee": "", "batch_size": ""}, {"name": "MSFC", "label": "MSFC", "type": "structured_courses", "lab": "All", "duration": "", "fee": "", "batch_size": ""}, {"name": "KB", "label": "KB", "type": "structured_courses", "lab": "All", "duration": "", "fee": "", "batch_size": ""}, {"name": "KV", "label": "KV", "type": "structured_courses", "lab": "All", "duration": "", "fee": "", "batch_size": ""}, {"name": "Textbooks_Customised", "label": "Textbooks (Customised Learning Programs)", "type": "structured_courses", "lab": "All", "duration": "", "fee": "", "batch_size": ""}, {"name": "Two_Wheeler_Servicing_Basic", "label": "Two Wheeler Servicing (Basic)", "type": "workshops", "lab": "Engineering", "duration": "0.5 Day", "fee": "1000", "batch_size": "10"}, {"name": "Little_Wood_Creators", "label": "Little Wood Creators", "type": "workshops", "lab": "Engineering", "duration": "0.5 Day", "fee": "2000", "batch_size": "8"}, {"name": "Basic_Woodcraft_Design", "label": "Basic - Woodcraft & Design", "type": "structured_courses", "lab": "Engineering", "duration": "2.5 Days", "fee": "3000", "batch_size": "8"}, {"name": "Intermediate_Woodcraft_Design", "label": "Intermediate - Woodcraft & Design", "type": "structured_courses", "lab": "Engineering", "duration": "5 Days", "fee": "5000", "batch_size": "8"}, {"name": "Advanced_Woodcraft_Design", "label": "Advanced- Woodcraft & Design", "type": "structured_courses", "lab": "Engineering", "duration": "36 Days", "fee": "15000", "batch_size": "8"}, {"name": "All_in_One_Serviceman_Handyman", "label": "All-in-One Serviceman (Handyman)", "type": "structured_courses", "lab": "Engineering", "duration": "144 Days", "fee": "30000", "batch_size": "10"}, {"name": "Home_Electrician_Course_Professional", "label": "Home Electrician Course (Professional & Homemakers)", "type": "structured_courses", "lab": "Electrical", "duration": "6 Days", "fee": "4200", "batch_size": "12"}, {"name": "Junior_Household_Electrician", "label": "Junior Household Electrician", "type": "structured_courses", "lab": "Electrical", "duration": "6 Days", "fee": "4000", "batch_size": "12"}, {"name": "Automation", "label": "Automation", "type": "structured_courses", "lab": "Mechatronics", "duration": "24 Days", "fee": "5000", "batch_size": "8"}, {"name": "3D_Design_Printing", "label": "3D Design & Printing", "type": "structured_courses", "lab": "Mechatronics", "duration": "6 Days", "fee": "3000", "batch_size": "8"}, {"name": "App_Development", "label": "App Development", "type": "structured_courses", "lab": "Mechatronics", "duration": "6 Days", "fee": "3000", "batch_size": "8"}, {"name": "PCB_Design", "label": "PCB Design", "type": "structured_courses", "lab": "Mechatronics", "duration": "6 Days", "fee": "3000", "batch_size": "4"}, {"name": "Robotics", "label": "Robotics", "type": "structured_courses", "lab": "Mechatronics", "duration": "8 Days", "fee": "4000", "batch_size": "8"}, {"name": "Gardening_Techniques_Intermediate", "label": "Gardening Techniques - Intermediate", "type": "structured_courses", "lab": "Agriculture", "duration": "6 Days", "fee": "4000", "batch_size": "6"}, {"name": "Gardening_Advanced", "label": "Gardening - Advanced", "type": "structured_courses", "lab": "Agriculture", "duration": "18 Days", "fee": "7500", "batch_size": "6"}, {"name": "Baking_Fundamentals", "label": "Baking Fundamentals", "type": "structured_courses", "lab": "Food_Processing", "duration": "4 Days", "fee": "2800", "batch_size": "6"}, {"name": "Junior_Bakers", "label": "Junior Bakers", "type": "workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "800", "batch_size": "6"}, {"name": "Cake_Crafting", "label": "Cake Crafting", "type": "workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "1000", "batch_size": "6"}, {"name": "Healthy_Baking", "label": "Healthy Baking", "type": "workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "800", "batch_size": "6"}, {"name": "Pizza_Frenzy", "label": "Pizza Frenzy", "type": "workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "1000", "batch_size": "6"}, {"name": "Momo_Mania", "label": "Momo Mania", "type": "workshops", "lab": "Food_Processing", "duration": "0.5 Day", "fee": "800", "batch_size": "10"}, {"name": "Assistant_Electrician_House_Wiring", "label": "Assistant Electrician (House Wiring)", "type": "structured_courses", "lab": "Electrical", "duration": "72 Days", "fee": "10000", "batch_size": "12"}, {"name": "Multiskill_Technician_Home_Appliances", "label": "Multiskill Technician (Home Appliances)", "type": "structured_courses", "lab": "Electrical", "duration": "72 Days", "fee": "10000", "batch_size": "12"}, {"name": "MSBSVET_Electrical_Wireman", "label": "MSBSVET Electrical Wireman", "type": "govt_certification", "lab": "Electrical", "duration": "144 Days", "fee": "15000", "batch_size": "12"}, {"name": "MSBSVET_Two_Wheeler_Servicing", "label": "MSBSVET Two Wheeler Servicing", "type": "govt_certification", "lab": "Engineering", "duration": "144 Days", "fee": "15000", "batch_size": "10"}, {"name": "Bakepreneurship", "label": "Bakepreneurship", "type": "entrepreneurship", "lab": "Food_Processing", "duration": "30 Days", "fee": "10000", "batch_size": "8"}, {"name": "Foodpreneurship", "label": "Foodpreneurship", "type": "entrepreneurship", "lab": "Food_Processing", "duration": "15 Days", "fee": "9000", "batch_size": "10"}, {"name": "Project_Based_Internship", "label": "Project-Based Internship", "type": "internship", "lab": "All", "duration": "5 Days", "fee": "2000", "batch_size": "12"}, {"name": "Service_Based_Internship", "label": "Service-Based Internship", "type": "internship", "lab": "All", "duration": "10 Days", "fee": "5000", "batch_size": "12"}, {"name": "Repair_Cafe", "label": "Repair Cafe", "type": "special_programs", "lab": "All", "duration": "0.5 Day", "fee": "200", "batch_size": "12"}, {"name": "Birthday_Celebration", "label": "Birthday Celebration", "type": "special_programs", "lab": "All", "duration": "", "fee": "", "batch_size": ""}, {"name": "Skill_Camps", "label": "Skill Camps", "type": "special_programs", "lab": "All", "duration": "7 Days", "fee": "2400", "batch_size": ""}];
+const CHOICES = {"enroll_type_list": [{"name": "individual", "label": "Individual Student", "filter": null}, {"name": "bulk", "label": "Bulk Enrollment", "filter": null}], "gender_list": [{"name": "male", "label": "Male", "filter": null}, {"name": "female", "label": "Female", "filter": null}, {"name": "other", "label": "Other", "filter": null}], "grade_list": [{"name": "school", "label": "School Student (Up to 10th)", "filter": null}, {"name": "secondary_iti", "label": "Higher Secondary / ITI / Diploma", "filter": null}, {"name": "college", "label": "College / Degree Student", "filter": null}, {"name": "working", "label": "Working / Self-Employed", "filter": null}, {"name": "dropout", "label": "Not Currently Studying / Dropout", "filter": null}], "class_list": [{"name": "5", "label": "5th Standard", "filter": null}, {"name": "6", "label": "6th Standard", "filter": null}, {"name": "7", "label": "7th Standard", "filter": null}, {"name": "8", "label": "8th Standard", "filter": null}, {"name": "9", "label": "9th Standard", "filter": null}, {"name": "10", "label": "10th Standard", "filter": null}], "pay_mode": [{"name": "cash", "label": "Cash", "filter": null}, {"name": "upi", "label": "UPI / GPay / PhonePe", "filter": null}, {"name": "card", "label": "Debit / Credit Card", "filter": null}, {"name": "bank", "label": "Cheque / Bank Transfer", "filter": null}], "lab_by_type": [{"name": "All", "label": "All Labs", "filter": "exposure_program"}, {"name": "Engineering", "label": "Engineering Lab", "filter": "workshops"}, {"name": "Electrical", "label": "Electrical Lab", "filter": "workshops"}, {"name": "Mechatronics", "label": "Mechatronics Lab", "filter": "workshops"}, {"name": "Agriculture", "label": "Agriculture Lab", "filter": "workshops"}, {"name": "Food_Processing", "label": "Food Processing Lab", "filter": "workshops"}, {"name": "Electrical", "label": "Electrical Lab", "filter": "thematic_workshops"}, {"name": "Food_Processing", "label": "Food Processing Lab", "filter": "thematic_workshops"}, {"name": "All", "label": "All Labs", "filter": "training"}, {"name": "All", "label": "All Labs", "filter": "structured_courses"}, {"name": "Engineering", "label": "Engineering Lab", "filter": "structured_courses"}, {"name": "Electrical", "label": "Electrical Lab", "filter": "structured_courses"}, {"name": "Mechatronics", "label": "Mechatronics Lab", "filter": "structured_courses"}, {"name": "Agriculture", "label": "Agriculture Lab", "filter": "structured_courses"}, {"name": "Food_Processing", "label": "Food Processing Lab", "filter": "structured_courses"}, {"name": "Electrical", "label": "Electrical Lab", "filter": "govt_certification"}, {"name": "Engineering", "label": "Engineering Lab", "filter": "govt_certification"}, {"name": "Food_Processing", "label": "Food Processing Lab", "filter": "entrepreneurship"}, {"name": "All", "label": "All Labs", "filter": "internship"}, {"name": "All", "label": "All Labs", "filter": "special_programs"}], "course_info_list": [{"name": "friend", "label": "Friend / Family (Referral)", "filter": null}, {"name": "org", "label": "Organization / Institution (Referral)", "filter": null}, {"name": "colleague", "label": "Colleague (Referral)", "filter": null}, {"name": "social_media", "label": "Social Media", "filter": null}, {"name": "website", "label": "Website", "filter": null}, {"name": "ad", "label": "Advertisement", "filter": null}, {"name": "other", "label": "Other (please specify)", "filter": null}, {"name": "no", "label": "Not Applicable", "filter": null}], "status_list": [{"name": "full", "label": "Full Paid", "filter": null}, {"name": "partial", "label": "Partial Paid", "filter": null}, {"name": "school_pay", "label": "School Payment", "filter": null}, {"name": "org_pay", "label": "Organization Payment", "filter": null}, {"name": "not_paid", "label": "Not Paid", "filter": null}, {"name": "na", "label": "Not Applicable / Scholarship", "filter": null}], "course_type_list": [{"name": "exposure_program", "label": "Exposure Program", "filter": null}, {"name": "workshops", "label": "Workshops", "filter": null}, {"name": "thematic_workshops", "label": "Thematic Workshops", "filter": null}, {"name": "training", "label": "Training", "filter": null}, {"name": "structured_courses", "label": "Structured Courses", "filter": null}, {"name": "govt_certification", "label": "Govt. Certification Programs", "filter": null}, {"name": "entrepreneurship", "label": "Entrepreneurship", "filter": null}, {"name": "internship", "label": "Internship", "filter": null}, {"name": "special_programs", "label": "Special Programs", "filter": null}]};
+
+// ---- CONFIG: fill these in after you deploy the Apps Script web app ----
+const CONFIG = {
+  APPS_SCRIPT_URL: "PASTE_YOUR_DEPLOYED_WEB_APP_URL_HERE",
+  SECRET_TOKEN: "CHANGE_ME_TOKEN"
+};
+// --------------------------------------------------------------------
+
+const els = {
+  courseType: document.getElementById('courseType'),
+  labCenter: document.getElementById('labCenter'),
+  courseSelect: document.getElementById('courseSelect'),
+  courseInfo: document.getElementById('courseInfo'),
+  enrollDate: document.getElementById('enrollDate'),
+  courseEndDate: document.getElementById('courseEndDate'),
+  batchNumber: document.getElementById('batchNumber'),
+  numStudents: document.getElementById('numStudents'),
+  matchRowsBtn: document.getElementById('matchRowsBtn'),
+  studentBody: document.getElementById('studentBody'),
+  addRowBtn: document.getElementById('addRowBtn'),
+  clearGridBtn: document.getElementById('clearGridBtn'),
+  exportCsvBtn: document.getElementById('exportCsvBtn'),
+  rowCountHint: document.getElementById('rowCountHint'),
+  gridErrors: document.getElementById('gridErrors'),
+  feePerHead: document.getElementById('feePerHead'),
+  feeStatus: document.getElementById('feeStatus'),
+  payingOrgField: document.getElementById('payingOrgField'),
+  payingOrgName: document.getElementById('payingOrgName'),
+  feePaidRow: document.getElementById('feePaidRow'),
+  feePaid: document.getElementById('feePaid'),
+  payModeField: document.getElementById('payModeField'),
+  feePayMode: document.getElementById('feePayMode'),
+  paymentProofField: document.getElementById('paymentProofField'),
+  paymentProof: document.getElementById('paymentProof'),
+  howKnow: document.getElementById('howKnow'),
+  referralField: document.getElementById('referralField'),
+  referralName: document.getElementById('referralName'),
+  otherSpecifyField: document.getElementById('otherSpecifyField'),
+  otherSpecify: document.getElementById('otherSpecify'),
+  totStudents: document.getElementById('totStudents'),
+  totFee: document.getElementById('totFee'),
+  totPending: document.getElementById('totPending'),
+  statusMsg: document.getElementById('statusMsg'),
+  submitBtn: document.getElementById('submitBtn')
+};
+
+const GRID_COLS = [
+  {key:'first_name', type:'text', ph:'First'},
+  {key:'middle_name', type:'text', ph:'Middle'},
+  {key:'last_name', type:'text', ph:'Last'},
+  {key:'age', type:'text', ph:'Age'},
+  {key:'gender', type:'select', list:'gender_list'},
+  {key:'current_grade', type:'select', list:'grade_list'},
+  {key:'student_class', type:'select', list:'class_list'},
+  {key:'school_name', type:'text', ph:'School'},
+  {key:'college_name', type:'text', ph:'College / ITI'},
+  {key:'address', type:'text', ph:'Village / City'},
+  {key:'mobile_number', type:'text', ph:'10-digit mobile'},
+  {key:'email_id', type:'text', ph:'email@example.com'}
+];
+
+function fillSelect(sel, options, placeholder){
+  sel.innerHTML = '';
+  const ph = document.createElement('option');
+  ph.value=''; ph.textContent = placeholder || 'Select…';
+  sel.appendChild(ph);
+  options.forEach(o=>{
+    const opt = document.createElement('option');
+    opt.value = o.name; opt.textContent = o.label;
+    sel.appendChild(opt);
+  });
+}
+
+fillSelect(els.courseType, CHOICES.course_type_list);
+fillSelect(els.feeStatus, CHOICES.status_list);
+fillSelect(els.feePayMode, CHOICES.pay_mode);
+fillSelect(els.howKnow, CHOICES.course_info_list);
+
+els.courseType.addEventListener('change', ()=>{
+  const t = els.courseType.value;
+  if(!t){
+    els.labCenter.disabled = true; els.labCenter.innerHTML='<option value="">Select course type first</option>';
+    els.courseSelect.disabled = true; els.courseSelect.innerHTML='<option value="">Select training center first</option>';
+    els.courseInfo.classList.remove('show');
+    return;
+  }
+  const labs = CHOICES.lab_by_type.filter(l=>l.filter===t);
+  fillSelect(els.labCenter, labs);
+  els.labCenter.disabled = false;
+  els.courseSelect.disabled = true;
+  els.courseSelect.innerHTML = '<option value="">Select training center first</option>';
+  els.courseInfo.classList.remove('show');
+});
+
+els.labCenter.addEventListener('change', ()=>{
+  const t = els.courseType.value, lab = els.labCenter.value;
+  if(!lab){ els.courseSelect.disabled=true; return; }
+  const opts = COURSES.filter(c=>c.type===t && c.lab===lab)
+    .map(c=>({name:c.name, label:c.label}));
+  fillSelect(els.courseSelect, opts);
+  els.courseSelect.disabled = false;
+  els.courseInfo.classList.remove('show');
+});
+
+els.courseSelect.addEventListener('change', ()=>{
+  const c = COURSES.find(c=>c.name===els.courseSelect.value);
+  if(!c){ els.courseInfo.classList.remove('show'); return; }
+  const fee = c.fee ? ('₹' + c.fee) : 'not fixed';
+  const dur = c.duration || 'not set';
+  els.courseInfo.textContent = `Duration: ${dur}   |   Typical fee: ${fee}   |   Usual batch size: ${c.batch_size || '—'}`;
+  els.courseInfo.classList.add('show');
+});
+
+// ---- Payment conditionals ----
+function refreshPaymentConditionals(){
+  const status = els.feeStatus.value;
+  const showOrg = status==='school_pay' || status==='org_pay';
+  els.payingOrgField.classList.toggle('show', showOrg);
+  const showPaid = ['full','partial','school_pay','org_pay'].includes(status);
+  els.feePaidRow.classList.toggle('show', showPaid);
+  if(!showPaid){ els.feePaid.value=''; }
+  computeTotals();
+}
+function refreshPayModeConditionals(){
+  const paid = parseFloat(els.feePaid.value)||0;
+  const showMode = paid > 0;
+  els.payModeField.classList.toggle('show', showMode);
+  const mode = els.feePayMode.value;
+  const showProof = ['upi','card','bank'].includes(mode);
+  els.paymentProofField.classList.toggle('show', showProof);
+}
+els.feeStatus.addEventListener('change', refreshPaymentConditionals);
+els.feePaid.addEventListener('input', ()=>{ refreshPayModeConditionals(); computeTotals(); });
+els.feePayMode.addEventListener('change', refreshPayModeConditionals);
+els.howKnow.addEventListener('change', ()=>{
+  const v = els.howKnow.value;
+  els.referralField.classList.toggle('show', ['friend','org','colleague'].includes(v));
+  els.otherSpecifyField.classList.toggle('show', v==='other');
+});
+els.feePerHead.addEventListener('input', computeTotals);
+
+// ---- Student grid ----
+function makeCell(col){
+  const td = document.createElement('td');
+  if(col.type==='select'){
+    const sel = document.createElement('select');
+    sel.dataset.key = col.key;
+    fillSelect(sel, CHOICES[col.list], '—');
+    td.appendChild(sel);
+  } else {
+    td.setAttribute('contenteditable','true');
+    td.dataset.key = col.key;
+    td.dataset.ph = col.ph || '';
+  }
+  return td;
+}
+
+function addRow(){
+  const tr = document.createElement('tr');
+  const rn = document.createElement('td');
+  rn.className='rownum';
+  tr.appendChild(rn);
+  GRID_COLS.forEach(col=>tr.appendChild(makeCell(col)));
+  const idTd = document.createElement('td');
+  idTd.className='readonly';
+  idTd.dataset.key='student_id_preview';
+  tr.appendChild(idTd);
+  els.studentBody.appendChild(tr);
+  renumberRows();
+  return tr;
+}
+
+function renumberRows(){
+  [...els.studentBody.children].forEach((tr,i)=>{ tr.firstChild.textContent = i+1; });
+  els.rowCountHint.textContent = els.studentBody.children.length + ' rows';
+}
+
+function clearGrid(){
+  els.studentBody.innerHTML='';
+  addRow();
+}
+
+els.addRowBtn.addEventListener('click', ()=>addRow());
+els.clearGridBtn.addEventListener('click', ()=>{
+  if(confirm('Clear all pasted student rows?')) clearGrid();
+});
+els.matchRowsBtn.addEventListener('click', ()=>{
+  const n = parseInt(els.numStudents.value)||0;
+  if(n<=0){ alert('Enter number of students first.'); return; }
+  const current = els.studentBody.children.length;
+  for(let i=current;i<n;i++) addRow();
+  renumberRows();
+});
+
+function fuzzyMatchOption(list, text){
+  if(!text) return '';
+  const t = text.trim().toLowerCase();
+  let found = list.find(o=>o.name.toLowerCase()===t || o.label.toLowerCase()===t);
+  if(found) return found.name;
+  found = list.find(o=>o.label.toLowerCase().includes(t) || t.includes(o.name.toLowerCase()));
+  if(found) return found.name;
+  const synonyms = {
+    'm':'male','f':'female','male':'male','female':'female',
+    'school':'school','iti':'secondary_iti','secondary':'secondary_iti','diploma':'secondary_iti',
+    'college':'college','degree':'college','working':'working','dropout':'dropout','not studying':'dropout'
+  };
+  if(synonyms[t] && list.some(o=>o.name===synonyms[t])) return synonyms[t];
+  return '';
+}
+
+function setCellValue(td, col, rawText){
+  if(col.type==='select'){
+    const sel = td.querySelector('select');
+    const match = fuzzyMatchOption(CHOICES[col.list], rawText);
+    sel.value = match || '';
+  } else {
+    td.textContent = rawText.trim();
+  }
+}
+
+function getCellValue(td, col){
+  if(col.type==='select') return td.querySelector('select').value;
+  return td.textContent.trim();
+}
+
+// Track focused cell for paste anchor
+let focusRow = 0, focusCol = 0;
+els.studentBody.addEventListener('focusin', (e)=>{
+  const td = e.target.closest('td');
+  if(!td || td.classList.contains('rownum') || td.classList.contains('readonly')) return;
+  const tr = td.parentElement;
+  focusRow = [...els.studentBody.children].indexOf(tr);
+  focusCol = [...tr.children].indexOf(td) - 1; // minus rownum col
+});
+
+els.studentBody.addEventListener('paste', (e)=>{
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData('text');
+  if(!text) return;
+  const rows = text.replace(/\r/g,'').split('\n').filter((r,i,arr)=> !(i===arr.length-1 && r===''));
+  rows.forEach((rowText, rOffset)=>{
+    const cells = rowText.split('\t');
+    const targetRowIndex = focusRow + rOffset;
+    while(els.studentBody.children.length <= targetRowIndex) addRow();
+    const tr = els.studentBody.children[targetRowIndex];
+    cells.forEach((cellText, cOffset)=>{
+      const colIndex = focusCol + cOffset;
+      if(colIndex < 0 || colIndex >= GRID_COLS.length) return;
+      const td = tr.children[colIndex+1]; // +1 for rownum col
+      setCellValue(td, GRID_COLS[colIndex], cellText);
+    });
+  });
+  renumberRows();
+  validateGrid();
+  computeTotals();
+});
+
+els.studentBody.addEventListener('input', ()=>{ validateGrid(); computeTotals(); });
+els.studentBody.addEventListener('change', ()=>{ validateGrid(); computeTotals(); });
+
+function computeStudentId(first, mobile){
+  const f = (first||'').replace(/[^a-zA-Z]/g,'').slice(0,3).toUpperCase();
+  const m = (mobile||'').replace(/[^0-9]/g,'').slice(-5);
+  return f + m;
+}
+
+function readGridRows(){
+  return [...els.studentBody.children].map(tr=>{
+    const obj = {};
+    GRID_COLS.forEach((col,i)=>{
+      obj[col.key] = getCellValue(tr.children[i+1], col);
+    });
+    return {tr, data:obj};
+  });
+}
+
+function isRowBlank(d){
+  return !d.first_name && !d.last_name && !d.mobile_number && !d.email_id;
+}
+
+function validateGrid(){
+  const rows = readGridRows();
+  const errors = [];
+  rows.forEach((r,i)=>{
+    const d = r.data;
+    r.tr.classList.remove('invalid');
+    if(isRowBlank(d)) return;
+    const rowErrs = [];
+    if(!d.first_name) rowErrs.push('first name');
+    if(!d.last_name) rowErrs.push('last name');
+    if(!d.age || isNaN(parseInt(d.age)) || parseInt(d.age) < 10) rowErrs.push('age (must be 10+)');
+    if(!d.gender) rowErrs.push('gender');
+    if(!d.current_grade) rowErrs.push('status');
+    if(d.current_grade==='school' && !d.student_class) rowErrs.push('class');
+    if(d.current_grade==='school' && !d.school_name) rowErrs.push('school name');
+    if((d.current_grade==='secondary_iti'||d.current_grade==='college') && !d.college_name) rowErrs.push('college/ITI name');
+    if(!d.address) rowErrs.push('village/city area');
+    if(!/^[0-9]{10}$/.test(d.mobile_number||'')) rowErrs.push('mobile (10 digits)');
+    if(!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(d.email_id||'')) rowErrs.push('email');
+    if(rowErrs.length){
+      r.tr.classList.add('invalid');
+      errors.push(`Row ${i+1}: ${rowErrs.join(', ')}`);
+    }
+    const idTd = r.tr.querySelector('[data-key="student_id_preview"]');
+    idTd.textContent = computeStudentId(d.first_name, d.mobile_number);
+  });
+  if(errors.length){
+    els.gridErrors.innerHTML = `<strong>${errors.length} row(s) need attention:</strong><ul>${errors.slice(0,15).map(e=>`<li>${e}</li>`).join('')}</ul>` + (errors.length>15?`<div>…and ${errors.length-15} more.</div>`:'');
+    els.gridErrors.classList.add('show');
+  } else {
+    els.gridErrors.classList.remove('show');
+  }
+  return errors;
+}
+
+function computeTotals(){
+  const rows = readGridRows().map(r=>r.data).filter(d=>!isRowBlank(d));
+  const n = rows.length;
+  const feePerHead = parseFloat(els.feePerHead.value)||0;
+  const total = feePerHead * n;
+  const paid = parseFloat(els.feePaid.value)||0;
+  const pending = total - paid;
+  els.totStudents.textContent = n;
+  els.totFee.textContent = '₹' + total.toLocaleString('en-IN');
+  els.totPending.textContent = '₹' + pending.toLocaleString('en-IN');
+}
+
+function csvEscape(v){
+  v = String(v==null?'':v);
+  if(/[",\n]/.test(v)) return '"' + v.replace(/"/g,'""') + '"';
+  return v;
+}
+els.exportCsvBtn.addEventListener('click', ()=>{
+  const rows = readGridRows().map(r=>r.data);
+  const header = GRID_COLS.map(c=>c.key);
+  const lines = [header.join(',')].concat(rows.map(d=>header.map(h=>csvEscape(d[h])).join(',')));
+  const blob = new Blob([lines.join('\n')], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `karigar_batch_backup_${Date.now()}.csv`;
+  a.click();
+});
+
+// init grid with a few blank rows
+for(let i=0;i<3;i++) addRow();
+
+// ---- Submit ----
+function fileToBase64(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function submitBatch(){
+  els.statusMsg.textContent = '';
+  const gridErrors = validateGrid();
+  const problems = [];
+
+  if(!els.courseType.value) problems.push('course type');
+  if(!els.labCenter.value) problems.push('training center');
+  if(!els.courseSelect.value) problems.push('course');
+  if(!els.enrollDate.value) problems.push('course start date');
+  if(!els.courseEndDate.value) problems.push('course end date');
+  if(els.courseEndDate.value && els.enrollDate.value && els.courseEndDate.value < els.enrollDate.value) problems.push('end date is before start date');
+  if(!els.batchNumber.value || parseInt(els.batchNumber.value)<=0) problems.push('batch number');
+  if(!els.numStudents.value || parseInt(els.numStudents.value)<=0) problems.push('number of students');
+  if(!els.feePerHead.value || parseFloat(els.feePerHead.value)<=0) problems.push('fee per participant');
+  if(!els.feeStatus.value) problems.push('payment status');
+  if(!els.howKnow.value) problems.push('"how did you hear about us"');
+
+  const rows = readGridRows().map(r=>r.data).filter(d=>!isRowBlank(d));
+  if(rows.length===0) problems.push('at least one student row');
+  if(gridErrors.length) problems.push(`${gridErrors.length} student row(s) with errors (see red rows above)`);
+
+  if(CONFIG.APPS_SCRIPT_URL.includes('PASTE_YOUR_DEPLOYED')) problems.push('Apps Script URL not configured yet (edit CONFIG in this file)');
+
+  if(problems.length){
+    els.statusMsg.textContent = 'Fix before submitting: ' + problems.join('; ');
+    els.statusMsg.style.color = 'var(--rust)';
+    return;
+  }
+
+  els.submitBtn.disabled = true;
+  els.statusMsg.style.color = 'var(--ink-soft)';
+  els.statusMsg.textContent = 'Sending…';
+
+  const course = COURSES.find(c=>c.name===els.courseSelect.value);
+  const feePerHead = parseFloat(els.feePerHead.value)||0;
+  const totalFee = feePerHead * rows.length;
+  const feePaid = parseFloat(els.feePaid.value)||0;
+
+  let proofBase64 = null, proofName = null;
+  if(els.paymentProof.files && els.paymentProof.files[0]){
+    proofName = els.paymentProof.files[0].name;
+    proofBase64 = await fileToBase64(els.paymentProof.files[0]);
+  }
+
+  const payload = {
+    token: CONFIG.SECRET_TOKEN,
+    course: {
+      course_type: els.courseType.value,
+      lab_center: els.labCenter.value,
+      selected_course: course.name,
+      course_label: course.label,
+      duration: course.duration,
+      fee_reference: course.fee,
+      enroll_date: els.enrollDate.value,
+      course_end_date: els.courseEndDate.value
+    },
+    batch: {
+      batch_number: els.batchNumber.value,
+      num_students_declared: els.numStudents.value,
+      num_students_actual: rows.length
+    },
+    payment: {
+      fee_per_head: feePerHead,
+      total_fee: totalFee,
+      fee_status: els.feeStatus.value,
+      paying_org_name: els.payingOrgName.value || '',
+      fee_paid: feePaid,
+      pending_balance: totalFee - feePaid,
+      fee_pay_mode: els.feePayMode.value || '',
+      how_know: els.howKnow.value,
+      referral_name: els.referralName.value || '',
+      other_specify: els.otherSpecify.value || '',
+      payment_proof_base64: proofBase64,
+      payment_proof_filename: proofName
+    },
+    students: rows.map(d=>({...d, full_name: [d.first_name,d.middle_name,d.last_name].filter(Boolean).join(' ').toUpperCase()}))
+  };
+
+  try{
+    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify(payload)
+    });
+    const result = await resp.json();
+    if(result.status === 'success'){
+      els.statusMsg.innerHTML = `<span class="stamp">✓ Registered — ID ${result.registration_id}</span>`;
+      els.submitBtn.disabled = false;
+    } else {
+      throw new Error(result.message || 'Unknown error from server');
+    }
+  } catch(err){
+    els.statusMsg.style.color = 'var(--rust)';
+    els.statusMsg.textContent = 'Could not save: ' + err.message + ' — your data is still on this page, use "Export backup CSV" if you need to leave.';
+    els.submitBtn.disabled = false;
+  }
+}
+
+els.submitBtn.addEventListener('click', submitBatch);
+refreshPaymentConditionals();
+</script>
+</body>
+</html>
