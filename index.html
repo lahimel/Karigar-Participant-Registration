@@ -488,18 +488,18 @@ const els = {
 };
 
 const GRID_COLS = [
-  {key:'first_name', type:'text', ph:'First'},
-  {key:'middle_name', type:'text', ph:'Middle'},
-  {key:'last_name', type:'text', ph:'Last'},
-  {key:'age', type:'text', ph:'Age'},
-  {key:'gender', type:'select', list:'gender_list'},
-  {key:'current_grade', type:'select', list:'grade_list'},
-  {key:'student_class', type:'select', list:'class_list'},
-  {key:'school_name', type:'text', ph:'School'},
-  {key:'college_name', type:'text', ph:'College / ITI'},
-  {key:'address', type:'text', ph:'Village / City'},
-  {key:'mobile_number', type:'text', ph:'Mobile (6-9 start)'},
-  {key:'email_id', type:'text', ph:'email@example.com (optional)'}
+  {key:'first_name', type:'text', ph:'First', label:'First Name'},
+  {key:'middle_name', type:'text', ph:'Middle', label:'Middle Name'},
+  {key:'last_name', type:'text', ph:'Last', label:'Last Name'},
+  {key:'age', type:'text', ph:'Age', label:'Age'},
+  {key:'gender', type:'select', list:'gender_list', label:'Gender'},
+  {key:'current_grade', type:'select', list:'grade_list', label:'Status'},
+  {key:'student_class', type:'select', list:'class_list', label:'Class'},
+  {key:'school_name', type:'text', ph:'School', label:'School Name'},
+  {key:'college_name', type:'text', ph:'College / ITI', label:'College / ITI Name'},
+  {key:'address', type:'text', ph:'Village / City', label:'Village / City Area'},
+  {key:'mobile_number', type:'text', ph:'Mobile (6-9 start)', label:'Mobile Number'},
+  {key:'email_id', type:'text', ph:'email@example.com (optional)', label:'Email ID'}
 ];
 
 // Indian mobile numbers: 10 digits, first digit 6-9.
@@ -941,10 +941,24 @@ function csvEscape(v){
   if(/[",\n]/.test(v)) return '"' + v.replace(/"/g,'""') + '"';
   return v;
 }
+function getCellLabel(td, col){
+  if(col.type==='select'){
+    const sel = td.querySelector('select');
+    const opt = (CHOICES[col.list]||[]).find(o=>o.name===sel.value);
+    return opt ? opt.label : '';
+  }
+  return td.textContent.trim();
+}
 els.exportCsvBtn.addEventListener('click', ()=>{
-  const rows = readGridRows().map(r=>r.data);
-  const header = GRID_COLS.map(c=>c.key);
-  const lines = [header.join(',')].concat(rows.map(d=>header.map(h=>csvEscape(d[h])).join(',')));
+  const header = ['#', ...GRID_COLS.map(c=>c.label), 'Student ID'];
+  const lines = [header.map(csvEscape).join(',')];
+  [...els.studentBody.children].forEach((tr, i)=>{
+    const cells = [String(i+1)];
+    GRID_COLS.forEach((col, ci)=>{ cells.push(getCellLabel(tr.children[ci+1], col)); });
+    const idTd = tr.querySelector('[data-key="student_id_preview"]');
+    cells.push(idTd ? idTd.textContent.trim() : '');
+    lines.push(cells.map(csvEscape).join(','));
+  });
   const blob = new Blob([lines.join('\n')], {type:'text/csv'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
