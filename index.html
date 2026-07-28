@@ -695,6 +695,8 @@ function clearGrid(){
   els.studentBody.innerHTML='';
   addRow();
   els.numStudents.value = 1;
+  els.dupWarnings.classList.remove('show');
+  els.dupWarnings.innerHTML = '';
 }
 
 function trIsBlank(tr){
@@ -741,10 +743,14 @@ function resetForm(){
   els.enrollDate.value = '';
   els.courseEndDate.value = '';
   els.batchNumber.value = '';
+  els.batchNumberErr.classList.remove('show');
+  els.batchNumber.classList.remove('input-invalid');
   els.numStudents.value = '';
   els.studentBody.innerHTML = '';
   addRow();
   els.gridErrors.classList.remove('show');
+  els.dupWarnings.classList.remove('show');
+  els.dupWarnings.innerHTML = '';
   els.feePerHead.value = '';
   els.feeStatus.value = '';
   els.feeStatus.dispatchEvent(new Event('change'));
@@ -1075,7 +1081,11 @@ async function submitBatch(){
   if(!els.numStudents.value || parseInt(els.numStudents.value)<=0) problems.push('number of students');
   if(!els.feePerHead.value || parseFloat(els.feePerHead.value)<=0) problems.push('fee per participant');
   if(!els.feeStatus.value) problems.push('payment status');
+  if(els.payingOrgField.classList.contains('show') && !els.payingOrgName.value.trim()) problems.push('name of school/organization');
+  if(els.feePaidRow.classList.contains('show') && parseFloat(els.feePaid.value)>0 && !els.feePayMode.value) problems.push('payment mode');
   if(!els.howKnow.value) problems.push('"how did you hear about us"');
+  if(els.referralField.classList.contains('show') && !els.referralName.value.trim()) problems.push('referral name');
+  if(els.otherSpecifyField.classList.contains('show') && !els.otherSpecify.value.trim()) problems.push('please specify (how did you hear about us)');
   if(overpaid) problems.push('amount paid is more than the total fee for this submission');
 
   const rows = readGridRows().map(r=>r.data).filter(d=>!isRowBlank(d));
@@ -1124,10 +1134,18 @@ async function submitBatch(){
   const totalFee = feePerHead * rows.length;
   const feePaid = parseFloat(els.feePaid.value)||0;
 
-  let proofBase64 = null, proofName = null;
+  let proofBase64 = null, proofName = null, proofMime = null;
   if(els.paymentProof.files && els.paymentProof.files[0]){
-    proofName = els.paymentProof.files[0].name;
-    proofBase64 = await fileToBase64(els.paymentProof.files[0]);
+    const file = els.paymentProof.files[0];
+    const MAX_PROOF_BYTES = 5 * 1024 * 1024; // 5MB
+    if(file.size > MAX_PROOF_BYTES){
+      els.statusMsg.style.color = 'var(--rust)';
+      els.statusMsg.textContent = 'Payment screenshot is too large (max 5MB). Attach a smaller image or compress it, then try again.';
+      return;
+    }
+    proofName = file.name;
+    proofMime = file.type || 'image/jpeg';
+    proofBase64 = await fileToBase64(file);
   }
 
   const payload = {
@@ -1159,6 +1177,7 @@ async function submitBatch(){
       referral_name: els.referralName.value || '',
       other_specify: els.otherSpecify.value || '',
       payment_proof_base64: proofBase64,
+      payment_proof_mime: proofMime,
       payment_proof_filename: proofName
     },
     students: rows.map(d=>({...d, full_name: toTitleCase([d.first_name,d.middle_name,d.last_name].filter(Boolean).join(' '))}))
