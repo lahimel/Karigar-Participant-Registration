@@ -381,7 +381,7 @@ table.ledger td.rm button:hover{color:var(--rust);background:transparent;}
     <div class="field-row">
       <div class="field narrow">
         <label for="batchNumber">Batch Number</label>
-        <input type="number" id="batchNumber" min="1" step="1">
+        <input type="number" id="batchNumber" min="1" step="1" placeholder="Auto">
         <div class="paid-error" id="batchNumberErr"></div>
       </div>
       <div class="field narrow">
@@ -389,6 +389,7 @@ table.ledger td.rm button:hover{color:var(--rust);background:transparent;}
         <input type="number" id="numStudents" min="1" max="100" step="1">
       </div>
     </div>
+    <div class="hint" id="batchHint" style="margin-top:2px;"></div>
   </section>
 
   <section class="card" data-num="3">
@@ -605,6 +606,36 @@ function askConfirm(message, okText, cancelText){
   });
 }
 
+// One id per attempt: a retry of the SAME data reuses it, so the server can
+// recognise a repeat (e.g. after a timeout) and not save the batch twice.
+let pendingSubmission = null; // {id, fingerprint}
+let scriptSupportsDedupe = false;
+function newSubmissionId(){
+  try{ if(window.crypto && crypto.randomUUID) return crypto.randomUUID(); }catch(e){}
+  return 'sub-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
+let scriptSupportsAutoBatch = false;
+// What the server last told us about the batch number box
+let batchHintInfo = {known: false, suggested: 0, exists: false, existing: 0};
+function renderBatchHint(){
+  const hint = document.getElementById('batchHint');
+  if(!hint) return;
+  const v = String(els.batchNumber.value || '').trim();
+  const info = batchHintInfo;
+  if(!els.courseSelect.value){
+    hint.textContent = 'Leave Batch Number blank for a new batch (the number is assigned when you register), or type an existing batch number to add students to it.';
+  } else if(!v){
+    hint.textContent = 'New batch: the number is assigned when you register' + (info.known && info.suggested ? ` (next is ${info.suggested}).` : '.');
+  } else if(!info.known){
+    hint.textContent = 'Checking batch ' + v + '…';
+  } else if(info.exists){
+    hint.textContent = `Batch ${v} already exists for this course (${info.existing} student${info.existing === 1 ? '' : 's'}). New students will be added to it.`;
+  } else {
+    hint.textContent = `Batch ${v} is new. It will be created with this number.`;
+  }
+}
+
 let batchExistingCount = 0;       // students already saved under this course + batch (for top-ups)
 let scriptSupportsBlankMobiles = false; // set true once the updated Apps Script answers
 
@@ -763,6 +794,8 @@ els.courseSelect.addEventListener('change', ()=>{
 // ---- Batch number uniqueness (a batch number belongs to exactly one course) ----
 let batchCheckTimer = null;
 function scheduleBatchNumberCheck(){
+  batchHintInfo.known = false;
+  renderBatchHint();
   clearTimeout(batchCheckTimer);
   batchCheckTimer = setTimeout(checkBatchNumberConflict, 400);
 }
@@ -783,10 +816,12 @@ async function checkBatchNumberConflict(){
   els.batchNumberErr.textContent = '';
   els.batchNumber.classList.remove('input-invalid');
 
-  const batchNumber = els.batchNumber.value;
+  const batchNumber = String(els.batchNumber.value || '').trim(); // blank = new batch, number assigned on save
   const courseName = els.courseSelect.value;
-  if(!batchNumber || !courseName || CONFIG.APPS_SCRIPT_URL.includes('PASTE_YOUR_DEPLOYED')){
+  if(!courseName || CONFIG.APPS_SCRIPT_URL.includes('PASTE_YOUR_DEPLOYED')){
     if(batchExistingCount !== 0){ batchExistingCount = 0; validateGrid(); }
+    batchHintInfo = {known: false, suggested: 0, exists: false, existing: 0};
+    renderBatchHint();
     return null;
   }
 
@@ -799,10 +834,15 @@ async function checkBatchNumberConflict(){
     const result = await resp.json();
     if(result.status !== 'success') return null;
     scriptSupportsBlankMobiles = !!result.supports_blank_mobiles;
-    const cnt = result.conflict ? 0 : (Number(result.existing_students) || 0);
-    if(cnt !== batchExistingCount){ batchExistingCount = cnt; validateGrid(); }
+    scriptSupportsDedupe = !!result.supports_submission_ids;
+    scriptSupportsAutoBatch = !!result.supports_auto_batch;
+    const cnt = (result.conflict || !batchNumber) ? 0 : (Number(result.existing_students) || 0);
+    batchHintInfo = {known: true, suggested: Number(result.next_batch_number) || 0, exists: !!result.exists && !result.conflict, existing: cnt};
+    if(cnt !== batchExistingCount){ batchExistingCount = cnt; }
+    validateGrid();
+    renderBatchHint();
     if(result.conflict){
-      els.batchNumberErr.textContent = `Batch ${batchNumber} is already used for "${result.conflict.course_label}". Batch numbers must be unique across every course.`;
+      els.batchNumberErr.textContent = `Batch ${batchNumber} is already used for \"${result.conflict.course_label}\". Batch numbers must be unique across every course.`;
       els.batchNumberErr.classList.add('show');
       els.batchNumber.classList.add('input-invalid');
       return result.conflict;
@@ -926,6 +966,11 @@ els.clearGridBtn.addEventListener('click', async ()=>{
 
 async function resetForm(){
   if(!(await askConfirm('Reset the whole form? Everything entered so far will be cleared.', 'Reset form', 'Keep editing'))) return;
+  clearFormFields();
+  els.statusMsg.textContent = '';
+  clearDraft();
+}
+function clearFormFields(){
   els.courseType.value = '';
   els.courseType.dispatchEvent(new Event('change'));
   els.enrollDate.value = '';
@@ -956,10 +1001,11 @@ async function resetForm(){
   els_schoolContactNumber().classList.remove('input-invalid');
   document.getElementById('schoolContactErr').classList.remove('show');
   batchExistingCount = 0;
+  batchHintInfo = {known: false, suggested: 0, exists: false, existing: 0};
+  renderBatchHint();
   applyNoMobileUI();
   computeTotals();
-  els.statusMsg.textContent = '';
-  clearDraft();
+  pendingSubmission = null;
 }
 els.resetBtn.addEventListener('click', resetForm);
 document.getElementById('noMobile').addEventListener('change', applyNoMobileUI);
@@ -1122,7 +1168,7 @@ function validateGrid(){
       errors.push(`Row ${i+1}: ${rowErrs.join(', ')}`);
     }
     const idTd = r.tr.querySelector('[data-key="student_id_preview"]');
-    idTd.textContent = computeStudentId(d.first_name, d.mobile_number, els.batchNumber.value, batchExistingCount + serialIdx);
+    idTd.textContent = computeStudentId(d.first_name, d.mobile_number, els.batchNumber.value || (batchHintInfo.suggested ? String(batchHintInfo.suggested) : ''), batchExistingCount + serialIdx);
   });
   if(errors.length){
     els.gridErrors.innerHTML = `<strong>${errors.length} row(s) need attention:</strong><ul>${errors.slice(0,15).map(e=>`<li>${e}</li>`).join('')}</ul>` + (errors.length>15?`<div>…and ${errors.length-15} more.</div>`:'');
@@ -1285,7 +1331,7 @@ async function submitBatch(){
   if(!els.enrollDate.value) problems.push('course start date');
   if(!els.courseEndDate.value) problems.push('course end date');
   if(els.courseEndDate.value && els.enrollDate.value && els.courseEndDate.value < els.enrollDate.value) problems.push('end date is before start date');
-  if(!els.batchNumber.value || parseInt(els.batchNumber.value)<=0) problems.push('batch number');
+  if(els.batchNumber.value && parseInt(els.batchNumber.value)<=0) problems.push('batch number (leave blank for a new batch)');
   if(!els.numStudents.value || parseInt(els.numStudents.value)<=0) problems.push('number of students');
   if(!els.feePerHead.value || parseFloat(els.feePerHead.value)<=0) problems.push('fee per participant');
   if(!els.feeStatus.value) problems.push('payment status');
@@ -1331,6 +1377,11 @@ async function submitBatch(){
   const batchConflict = await checkBatchNumberConflict();
   if(batchConflict){
     els.statusMsg.textContent = `Batch ${els.batchNumber.value} is already used for "${batchConflict.course_label}". Choose a different batch number, or select that course instead.`;
+    els.statusMsg.style.color = 'var(--rust)';
+    return;
+  }
+  if(!String(els.batchNumber.value || '').trim() && !scriptSupportsAutoBatch){
+    els.statusMsg.textContent = 'Could not confirm that the Apps Script can assign batch numbers automatically. Update and redeploy the latest Code.gs (or check your connection), or type a batch number yourself.';
     els.statusMsg.style.color = 'var(--rust)';
     return;
   }
@@ -1418,35 +1469,53 @@ async function submitBatch(){
     },
     students: rows.map(d=>({...d, full_name: toTitleCase([d.first_name,d.middle_name,d.last_name].filter(Boolean).join(' '))}))
   };
+  const fingerprint = JSON.stringify({course: payload.course, batch: payload.batch,
+    payment: {...payload.payment, payment_proof_base64: proofBase64 ? proofBase64.length : 0}, students: payload.students});
+  if(!pendingSubmission || pendingSubmission.fingerprint !== fingerprint){
+    pendingSubmission = {id: newSubmissionId(), fingerprint};
+  }
+  payload.submission_id = pendingSubmission.id;
 
   try{
     const resp = await fetchWithTimeout(CONFIG.APPS_SCRIPT_URL, {
       method: 'POST',
       headers: {'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify(payload)
-    });
+    }, 60000);
     const result = await resp.json();
     if(result.status === 'success'){
-      const label = result.merged
-        ? `✓ Added ${result.students_saved} to existing Batch ${els.batchNumber.value}. Now ${result.batch_total_students} total, ₹${Number(result.batch_pending_balance).toLocaleString('en-IN')} pending`
-        : `✓ Registered (ID ${result.registration_id})`;
-      els.statusMsg.innerHTML = `<span class="stamp">${label}</span>`;
-      els.submitBtn.disabled = false;
+      const bn = result.batch_number || els.batchNumber.value;
+      const label = result.already_saved
+        ? `✓ Already saved earlier as Batch ${bn} (ID ${result.registration_id}), not added again`
+        : result.merged
+          ? `✓ Added ${result.students_saved} to existing Batch ${bn}. Now ${result.batch_total_students} total, ₹${Number(result.batch_pending_balance).toLocaleString('en-IN')} pending`
+          : `✓ Registered Batch ${bn} (ID ${result.registration_id})`;
+      // Start a clean form so the same batch cannot be sent twice by accident.
+      clearFormFields();
+      clearTimeout(draftSaveTimer);
       clearDraft();
+      els.submitBtn.disabled = false;
+      els.statusMsg.style.color = '';
+      els.statusMsg.innerHTML = `<span class="stamp">${label}</span>`;
+      try{ window.scrollTo({top: 0}); }catch(e){}
     } else {
       throw new Error(result.message || 'Unknown error from server');
     }
   } catch(err){
     const timedOut = err.name === 'AbortError';
-    const reason = timedOut ? 'Request timed out after 20 seconds, check your connection' : ('Could not save: ' + err.message);
+    const reason = timedOut ? 'Request timed out after 60 seconds, check your connection' : ('Could not save: ' + err.message);
     els.statusMsg.style.color = 'var(--rust)';
-    els.statusMsg.textContent = reason + '. Your data is still on this page, use "Export Excel template" if you need to leave, then try again.';
+    els.statusMsg.textContent = reason + '. Your data is still on this page.' +
+      (scriptSupportsDedupe ? ' It may already have been saved: press Register batch again and it will not be added twice.' : ' Press Register batch to try again.');
     els.submitBtn.disabled = false;
   }
 }
 
+let submitInFlight = false;
 els.submitBtn.addEventListener('click', ()=>{
-  submitBatch().catch(err=>{
+  if(submitInFlight) return; // double-click / impatient second tap
+  submitInFlight = true;
+  submitBatch().finally(()=>{ submitInFlight = false; }).catch(err=>{
     console.error(err);
     els.submitBtn.disabled = false;
     els.statusMsg.style.color = 'var(--rust)';
@@ -1454,6 +1523,7 @@ els.submitBtn.addEventListener('click', ()=>{
   });
 });
 refreshPaymentConditionals();
+renderBatchHint();
 
 // ---- Draft autosave (browser local storage; this page runs outside Claude's
 // sandbox as a normal static site, so localStorage is safe to use here) ----
@@ -1573,8 +1643,12 @@ async function checkForDraftOnLoad(){
   }
 }
 
-document.querySelector('.wrap').addEventListener('input', scheduleDraftSave);
-document.querySelector('.wrap').addEventListener('change', scheduleDraftSave);
+// (querySelectorAll: the first .wrap on the page is the header's, not the form's)
+document.querySelectorAll('.wrap').forEach(wrap=>{
+  wrap.addEventListener('input', ()=>{ if(els.statusMsg.querySelector('.stamp')) els.statusMsg.textContent = ''; });
+  wrap.addEventListener('input', scheduleDraftSave);
+  wrap.addEventListener('change', scheduleDraftSave);
+});
 checkForDraftOnLoad();
 
 // =====================================================================
