@@ -317,6 +317,12 @@ table.ledger td.rm button:hover{color:var(--rust);background:transparent;}
   .modal-head,.modal-foot{padding-left:14px;padding-right:14px;}
   .imp-chip{width:calc(50% - 5px);}
 }
+.nomobile-box{border:1px dashed var(--brass);background:#FBF8F0;border-radius:3px;padding:10px 14px;margin:0 0 14px;}
+.nomobile-box .check{display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:13.5px;font-weight:600;color:var(--ink);cursor:pointer;}
+.nomobile-box .check input{padding:0;width:16px;height:16px;}
+.nomobile-box .sub{font-size:12px;color:var(--ink-soft);margin:4px 0 0 24px;}
+.nomobile-box .field-row{margin:12px 0 0;}
+#impSummary .linkbtn{margin-top:6px;font-size:12.5px;padding:6px 12px;}
 .hidden{display:none !important;}
 .conditional{display:none;}
 .conditional.show{display:flex;}
@@ -385,6 +391,21 @@ table.ledger td.rm button:hover{color:var(--rust);background:transparent;}
   <section class="card" data-num="3">
     <h2 class="section-title">Student Details</h2>
     <p class="section-sub">The grid below always matches "Number of Students" above. Change either one and the other follows. Use “Paste from Excel / Sheets” to bring in a whole class list: columns can be in any order, and you get a preview before anything is added.</p>
+    <div class="nomobile-box">
+      <label class="check"><input type="checkbox" id="noMobile"> The school did not share student mobile numbers</label>
+      <p class="sub">Student mobile numbers become optional. Please add the school's contact below so someone can still be reached about this batch. Do not enter a made-up number.</p>
+      <div class="field-row conditional" id="schoolContactRow">
+        <div class="field">
+          <label for="schoolContactName">School contact person</label>
+          <input type="text" id="schoolContactName" placeholder="e.g. Principal, class teacher">
+        </div>
+        <div class="field">
+          <label for="schoolContactNumber">School contact number</label>
+          <input type="text" id="schoolContactNumber" inputmode="tel" placeholder="Mobile or landline with STD code">
+          <div class="paid-error" id="schoolContactErr">Enter 8 to 12 digits, or leave blank.</div>
+        </div>
+      </div>
+    </div>
     <div class="grid-toolbar">
       <button type="button" class="brass" id="openPasteBtn">Paste from Excel / Sheets</button>
       <button type="button" id="openUploadBtn">Upload Excel file</button>
@@ -536,6 +557,29 @@ const CONFIG = {
   SECRET_TOKEN: "AjAYME31Z5dgntu60g34"
 };
 // --------------------------------------------------------------------
+
+let batchExistingCount = 0;       // students already saved under this course + batch (for top-ups)
+let scriptSupportsBlankMobiles = false; // set true once the updated Apps Script answers
+
+function els_schoolContactName(){ return document.getElementById('schoolContactName'); }
+function els_schoolContactNumber(){ return document.getElementById('schoolContactNumber'); }
+function noMobileOn(){ const c = document.getElementById('noMobile'); return !!(c && c.checked); }
+// 8888888888, 9999999999, 1234567890 ... are placeholders, not real numbers
+function isPlaceholderMobile(m){
+  return /^(\d)\1{9}$/.test(m) || m === '1234567890' || m === '0123456789' || m === '9876543210';
+}
+function applyNoMobileUI(){
+  const on = noMobileOn();
+  document.getElementById('schoolContactRow').classList.toggle('show', on);
+  const idx = GRID_COLS.findIndex(c=>c.key==='mobile_number');
+  const ths = document.querySelectorAll('#studentGrid thead th');
+  if(ths[idx+1]) ths[idx+1].textContent = on ? 'Mobile Number (optional)' : 'Mobile Number';
+  [...els.studentBody.children].forEach(tr=>{
+    const td = tr.children[idx+1];
+    if(td) td.dataset.ph = on ? 'Optional' : (GRID_COLS[idx].ph || '');
+  });
+  validateGrid();
+}
 
 const els = {
   courseType: document.getElementById('courseType'),
@@ -694,7 +738,10 @@ async function checkBatchNumberConflict(){
 
   const batchNumber = els.batchNumber.value;
   const courseName = els.courseSelect.value;
-  if(!batchNumber || !courseName || CONFIG.APPS_SCRIPT_URL.includes('PASTE_YOUR_DEPLOYED')) return null;
+  if(!batchNumber || !courseName || CONFIG.APPS_SCRIPT_URL.includes('PASTE_YOUR_DEPLOYED')){
+    if(batchExistingCount !== 0){ batchExistingCount = 0; validateGrid(); }
+    return null;
+  }
 
   try{
     const resp = await fetchWithTimeout(CONFIG.APPS_SCRIPT_URL, {
@@ -704,6 +751,9 @@ async function checkBatchNumberConflict(){
     });
     const result = await resp.json();
     if(result.status !== 'success') return null;
+    scriptSupportsBlankMobiles = !!result.supports_blank_mobiles;
+    const cnt = result.conflict ? 0 : (Number(result.existing_students) || 0);
+    if(cnt !== batchExistingCount){ batchExistingCount = cnt; validateGrid(); }
     if(result.conflict){
       els.batchNumberErr.textContent = `Batch ${batchNumber} is already used for "${result.conflict.course_label}". Batch numbers must be unique across every course.`;
       els.batchNumberErr.classList.add('show');
@@ -757,7 +807,7 @@ function makeCell(col){
   } else {
     td.setAttribute('contenteditable','true');
     td.dataset.key = col.key;
-    td.dataset.ph = col.ph || '';
+    td.dataset.ph = (col.key==='mobile_number' && noMobileOn()) ? 'Optional' : (col.ph || '');
   }
   return td;
 }
@@ -853,11 +903,19 @@ function resetForm(){
   els.howKnow.dispatchEvent(new Event('change'));
   els.referralName.value = '';
   els.otherSpecify.value = '';
+  document.getElementById('noMobile').checked = false;
+  els_schoolContactName().value = '';
+  els_schoolContactNumber().value = '';
+  els_schoolContactNumber().classList.remove('input-invalid');
+  document.getElementById('schoolContactErr').classList.remove('show');
+  batchExistingCount = 0;
+  applyNoMobileUI();
   computeTotals();
   els.statusMsg.textContent = '';
   clearDraft();
 }
 els.resetBtn.addEventListener('click', resetForm);
+document.getElementById('noMobile').addEventListener('change', applyNoMobileUI);
 
 function fuzzyMatchOption(list, text){
   if(!text) return '';
@@ -951,10 +1009,15 @@ els.studentBody.addEventListener('paste', (e)=>{
 els.studentBody.addEventListener('input', ()=>{ validateGrid(); computeTotals(); });
 els.studentBody.addEventListener('change', ()=>{ validateGrid(); computeTotals(); });
 
-function computeStudentId(first, mobile){
+// With a mobile number: first 3 letters + last 5 digits (unchanged).
+// Without one: first 3 letters + batch + running number, e.g. RAH-B23-04.
+// The Apps Script uses the same rule and is the source of truth.
+function computeStudentId(first, mobile, batch, serial){
   const f = (first||'').replace(/[^a-zA-Z]/g,'').slice(0,3).toUpperCase();
-  const m = (mobile||'').replace(/[^0-9]/g,'').slice(-5);
-  return f + m;
+  const digits = (mobile||'').replace(/[^0-9]/g,'');
+  if(digits.length >= 5) return f + digits.slice(-5);
+  const b = String(batch||'').replace(/[^a-zA-Z0-9]/g,'') || '?';
+  return (f || 'STU') + '-B' + b + '-' + String(serial).padStart(2,'0');
 }
 
 function toTitleCase(str){
@@ -979,6 +1042,7 @@ function validateGrid(){
   const rows = readGridRows();
   const errors = [];
   const mobileCounts = {};
+  let serialIdx = 0;
   rows.forEach(r=>{
     const m = r.data.mobile_number;
     if(MOBILE_RE.test(m||'')) mobileCounts[m] = (mobileCounts[m]||0)+1;
@@ -987,6 +1051,7 @@ function validateGrid(){
     const d = r.data;
     r.tr.classList.remove('invalid');
     if(isRowBlank(d)) return;
+    serialIdx++;
     const rowErrs = [];
     if(!d.first_name) rowErrs.push('first name');
     if(!d.last_name) rowErrs.push('last name');
@@ -997,7 +1062,12 @@ function validateGrid(){
     if(d.current_grade==='school' && !d.school_name) rowErrs.push('school name');
     if((d.current_grade==='secondary_iti'||d.current_grade==='college') && !d.college_name) rowErrs.push('college/ITI name');
     if(!d.address) rowErrs.push('village/city area');
-    if(!MOBILE_RE.test(d.mobile_number||'')) rowErrs.push('mobile (10 digits, starting 6-9)');
+    if(d.mobile_number){
+      if(!MOBILE_RE.test(d.mobile_number)) rowErrs.push('mobile (10 digits, starting 6-9' + (noMobileOn() ? ', or leave blank' : '') + ')');
+      else if(isPlaceholderMobile(d.mobile_number)) rowErrs.push('mobile looks like a placeholder; leave it blank if the school did not share numbers');
+    } else if(!noMobileOn()){
+      rowErrs.push('mobile (10 digits, starting 6-9; if the school did not share numbers, tick the box above the grid)');
+    }
     if(d.email_id && !EMAIL_RE.test(d.email_id)) rowErrs.push('email format looks wrong');
     if(mobileCounts[d.mobile_number] > 1) rowErrs.push('mobile repeated within this batch (possible paste mistake)');
     if(rowErrs.length){
@@ -1005,7 +1075,7 @@ function validateGrid(){
       errors.push(`Row ${i+1}: ${rowErrs.join(', ')}`);
     }
     const idTd = r.tr.querySelector('[data-key="student_id_preview"]');
-    idTd.textContent = computeStudentId(d.first_name, d.mobile_number);
+    idTd.textContent = computeStudentId(d.first_name, d.mobile_number, els.batchNumber.value, batchExistingCount + serialIdx);
   });
   if(errors.length){
     els.gridErrors.innerHTML = `<strong>${errors.length} row(s) need attention:</strong><ul>${errors.slice(0,15).map(e=>`<li>${e}</li>`).join('')}</ul>` + (errors.length>15?`<div>…and ${errors.length-15} more.</div>`:'');
@@ -1182,6 +1252,14 @@ async function submitBatch(){
   const rows = readGridRows().map(r=>r.data).filter(d=>!isRowBlank(d));
   if(rows.length===0) problems.push('at least one student row');
   if(gridErrors.length) problems.push(`${gridErrors.length} student row(s) with errors (see red rows above)`);
+  const contactName = noMobileOn() ? els_schoolContactName().value.trim() : '';
+  const contactNumber = noMobileOn() ? els_schoolContactNumber().value.trim() : '';
+  const contactDigits = contactNumber.replace(/\D/g,'');
+  const contactErr = document.getElementById('schoolContactErr');
+  const contactBad = !!contactNumber && (contactDigits.length < 8 || contactDigits.length > 12 || isPlaceholderMobile(contactDigits));
+  contactErr.classList.toggle('show', contactBad);
+  els_schoolContactNumber().classList.toggle('input-invalid', contactBad);
+  if(contactBad) problems.push('school contact number (8 to 12 digits, not a placeholder)');
 
   if(CONFIG.APPS_SCRIPT_URL.includes('PASTE_YOUR_DEPLOYED')) problems.push('Apps Script URL not configured yet (edit CONFIG in this file)');
 
@@ -1191,11 +1269,21 @@ async function submitBatch(){
     return;
   }
 
+  const anyBlankMobile = rows.some(d=>!d.mobile_number);
+  if(rows.length && rows.every(d=>!d.mobile_number) && !contactNumber){
+    if(!confirm('None of these students has a phone number and no school contact number was entered, so nobody could be reached about this batch.\n\nSave anyway?')) return;
+  }
+
   els.statusMsg.style.color = 'var(--ink-soft)';
   els.statusMsg.textContent = 'Checking batch number…';
   const batchConflict = await checkBatchNumberConflict();
   if(batchConflict){
     els.statusMsg.textContent = `Batch ${els.batchNumber.value} is already used for "${batchConflict.course_label}". Choose a different batch number, or select that course instead.`;
+    els.statusMsg.style.color = 'var(--rust)';
+    return;
+  }
+  if(anyBlankMobile && !scriptSupportsBlankMobiles){
+    els.statusMsg.textContent = 'Could not confirm that the Apps Script supports blank student mobile numbers. Update and redeploy the latest Code.gs (or check your connection), then try again.';
     els.statusMsg.style.color = 'var(--rust)';
     return;
   }
@@ -1254,7 +1342,10 @@ async function submitBatch(){
     batch: {
       batch_number: els.batchNumber.value,
       num_students_declared: els.numStudents.value,
-      num_students_actual: rows.length
+      num_students_actual: rows.length,
+      mobile_not_shared: noMobileOn() && anyBlankMobile,
+      school_contact_name: contactName,
+      school_contact_number: contactNumber
     },
     payment: {
       fee_per_head: feePerHead,
@@ -1332,7 +1423,10 @@ function saveDraftNow(){
       feePayMode: els.feePayMode.value,
       howKnow: els.howKnow.value,
       referralName: els.referralName.value,
-      otherSpecify: els.otherSpecify.value
+      otherSpecify: els.otherSpecify.value,
+      noMobile: noMobileOn(),
+      schoolContactName: els_schoolContactName().value,
+      schoolContactNumber: els_schoolContactNumber().value
     };
     localStorage.setItem(DRAFT_KEY, JSON.stringify(state));
   } catch(err){
@@ -1388,6 +1482,10 @@ function restoreDraft(state){
   els.howKnow.dispatchEvent(new Event('change'));
   els.referralName.value = state.referralName || '';
   els.otherSpecify.value = state.otherSpecify || '';
+  document.getElementById('noMobile').checked = !!state.noMobile;
+  els_schoolContactName().value = state.schoolContactName || '';
+  els_schoolContactNumber().value = state.schoolContactNumber || '';
+  applyNoMobileUI();
 
   validateGrid();
   computeTotals();
@@ -1645,9 +1743,14 @@ function impValidate(v, counts, existingSet){
   if(v.current_grade === 'school' && !v.school_name) e.school_name = 'School name is required';
   if((v.current_grade === 'secondary_iti' || v.current_grade === 'college') && !v.college_name) e.college_name = 'College / ITI name is required';
   if(!v.address) e.address = 'Village / city is required';
-  if(!MOBILE_RE.test(v.mobile_number || '')) e.mobile_number = 'Needs 10 digits starting with 6 to 9';
-  else if(existingSet.has(v.mobile_number)) e.mobile_number = 'This number is already in the grid above';
-  else if(counts[v.mobile_number] > 1) e.mobile_number = 'This number appears more than once in this batch';
+  if(v.mobile_number){
+    if(!MOBILE_RE.test(v.mobile_number)) e.mobile_number = 'Needs 10 digits starting with 6 to 9' + (noMobileOn() ? ' (or leave blank)' : '');
+    else if(isPlaceholderMobile(v.mobile_number)) e.mobile_number = 'Looks like a placeholder number. Leave it blank if the school did not share numbers.';
+    else if(existingSet.has(v.mobile_number)) e.mobile_number = 'This number is already in the grid above';
+    else if(counts[v.mobile_number] > 1) e.mobile_number = 'This number appears more than once in this batch';
+  } else if(!noMobileOn()){
+    e.mobile_number = 'Mobile is required. If the school did not share numbers, tick the box above the grid.';
+  }
   if(v.email_id && !EMAIL_RE.test(v.email_id)) e.email_id = 'Email format looks wrong';
   return e;
 }
@@ -1753,7 +1856,7 @@ function impMissingFields(){
   if(!m.has('gender')) out.push('Gender');
   if(!m.has('current_grade') && !m.has('student_class')) out.push('Status');
   if(!m.has('address')) out.push('Village / City Area');
-  if(!m.has('mobile_number')) out.push('Mobile Number');
+  if(!m.has('mobile_number') && !noMobileOn()) out.push('Mobile Number');
   return out;
 }
 
@@ -1906,6 +2009,19 @@ function impRefreshFlags(){
   if(tidiedCells) notes.push(`${tidiedCells} value${tidiedCells === 1 ? ' was' : 's were'} tidied automatically (beige cells; hover to see the original).`);
   if(bad) notes.push('Type in a cell or pick from a dropdown to fix it. You can also import now and fix the rest in the grid.');
   notes.forEach(n=>{ const d = document.createElement('div'); d.className = 'note'; d.textContent = n; sum.appendChild(d); });
+  if(missing.includes('Mobile Number') || (!noMobileOn() && imp.records.some(r=>!r.v.mobile_number))){
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'linkbtn';
+    btn.textContent = 'The school did not share mobile numbers';
+    btn.addEventListener('click', ()=>{
+      const chk = document.getElementById('noMobile');
+      chk.checked = true;
+      chk.dispatchEvent(new Event('change', {bubbles:true}));
+      impRenderMapping(false);
+      impRefreshFlags();
+    });
+    sum.appendChild(btn);
+  }
 
   impEls.go.disabled = total === 0;
   impEls.go.textContent = total ? `Import ${total} student${total === 1 ? '' : 's'}` : 'Import';
