@@ -271,6 +271,52 @@ input.input-invalid{border-color:var(--rust);background:var(--rust-bg);}
   transform:rotate(-3deg);
   letter-spacing:0.04em;
 }
+
+/* ---- Paste & import dialog ---- */
+body.modal-open{overflow:hidden;}
+.modal-back{position:fixed;inset:0;background:rgba(31,42,36,0.6);display:none;align-items:flex-start;justify-content:center;padding:20px 14px;overflow-y:auto;z-index:50;}
+.modal-back.open{display:flex;}
+.modal-box{background:var(--surface);border:2px solid var(--ink);border-radius:2px;width:100%;max-width:1120px;margin:auto;}
+.modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 22px;border-bottom:2px solid var(--ink);}
+.modal-head h3{margin:0;font-family:"Space Grotesk",system-ui,sans-serif;font-size:19px;letter-spacing:-0.01em;}
+.modal-body{padding:18px 22px 8px;}
+.modal-foot{display:flex;gap:12px;align-items:center;justify-content:flex-end;flex-wrap:wrap;padding:14px 22px;border-top:1px solid var(--line);background:#FAFAF6;}
+.modal-foot .spacer{flex:1;}
+.imp-help{margin:0 0 12px;font-size:13px;color:var(--ink-soft);}
+#impText{width:100%;min-height:96px;max-height:220px;font-family:"IBM Plex Mono",monospace;font-size:12.5px;white-space:pre;overflow:auto;resize:vertical;}
+.imp-source-row{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin:10px 0 14px;font-size:13px;}
+.imp-source-row .hint{margin-left:2px;}
+.imp-opts{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;margin:0 0 10px;font-size:13px;}
+.imp-opts label{text-transform:none;letter-spacing:0;font-size:13px;font-weight:500;color:var(--ink);display:inline-flex;gap:6px;align-items:center;}
+.imp-opts input{padding:0;}
+details.imp-map-box{border:1px solid var(--line);border-radius:3px;margin:0 0 12px;background:#FAFAF6;}
+details.imp-map-box summary{cursor:pointer;padding:9px 12px;font-size:13px;font-weight:600;}
+.imp-map{display:flex;flex-wrap:wrap;gap:10px;padding:4px 12px 12px;}
+.imp-chip{border:1px solid var(--line);background:#fff;border-radius:3px;padding:8px 10px;width:176px;display:flex;flex-direction:column;gap:5px;}
+.imp-chip .src{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.imp-chip .sample{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-height:15px;}
+.imp-chip select{font-size:13px;padding:6px 6px;}
+.imp-chip.ignored{opacity:0.7;background:#F1F2EE;}
+#impSummary{font-size:13px;margin:0 0 10px;display:none;}
+#impSummary.show{display:block;}
+#impSummary .line{font-family:"IBM Plex Mono",monospace;}
+#impSummary .ok{color:var(--teal);font-weight:600;}
+#impSummary .bad{color:var(--rust);font-weight:600;}
+#impSummary .note{color:var(--ink-soft);font-size:12px;margin-top:3px;}
+.imp-scroll{max-height:42vh;overflow:auto;border:1px solid var(--line);border-radius:3px;margin-bottom:14px;}
+.imp-scroll table.ledger{min-width:1250px;}
+table.ledger td.cell-bad{background:var(--rust-bg) !important;box-shadow:inset 0 0 0 1px var(--rust);}
+table.ledger td.cell-tidied{background:#F7F1E3 !important;}
+table.ledger td .was{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--rust);padding:0 6px 4px;}
+table.ledger td.rm{text-align:center;padding:0;width:34px;}
+table.ledger td.rm button{border:none;background:transparent;font-size:15px;padding:6px 8px;color:var(--ink-soft);}
+table.ledger td.rm button:hover{color:var(--rust);background:transparent;}
+.imp-empty{padding:26px 14px;text-align:center;color:var(--ink-soft);font-size:13px;border:1px dashed var(--line);border-radius:3px;margin-bottom:14px;}
+@media (max-width:720px){
+  .modal-body{padding:14px 14px 6px;}
+  .modal-head,.modal-foot{padding-left:14px;padding-right:14px;}
+  .imp-chip{width:calc(50% - 5px);}
+}
 .hidden{display:none !important;}
 .conditional{display:none;}
 .conditional.show{display:flex;}
@@ -338,8 +384,10 @@ input.input-invalid{border-color:var(--rust);background:var(--rust-bg);}
 
   <section class="card" data-num="3">
     <h2 class="section-title">Student Details</h2>
-    <p class="section-sub">The grid below always matches "Number of Students" above. Change either one and the other follows. Click the first cell, then paste your Excel block straight in.</p>
+    <p class="section-sub">The grid below always matches "Number of Students" above. Change either one and the other follows. Use “Paste from Excel / Sheets” to bring in a whole class list: columns can be in any order, and you get a preview before anything is added.</p>
     <div class="grid-toolbar">
+      <button type="button" class="brass" id="openPasteBtn">Paste from Excel / Sheets</button>
+      <button type="button" id="openUploadBtn">Upload Excel file</button>
       <button type="button" id="addRowBtn">+ Add row</button>
       <button type="button" id="clearGridBtn">Clear grid</button>
       <button type="button" id="checkDupBtn">Check duplicates</button>
@@ -432,6 +480,49 @@ input.input-invalid{border-color:var(--rust);background:var(--rust-bg);}
     <button type="button" class="primary" id="submitBtn">Register batch</button>
   </div>
 
+</div>
+
+
+<div class="modal-back" id="impModal" role="dialog" aria-modal="true" aria-labelledby="impTitle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="impTitle">Paste students from Excel or Google Sheets</h3>
+      <button type="button" id="impClose" aria-label="Close">Close</button>
+    </div>
+    <div class="modal-body">
+      <p class="imp-help">In your sheet, select the student rows (include the heading row if you have one) and copy them. Click in the box below and paste. Columns can be in any order, and extra columns are ignored. If you have a single Name column, it is split into First, Middle and Last.</p>
+      <textarea id="impText" spellcheck="false" placeholder="Paste here (Ctrl+V)"></textarea>
+      <div class="imp-source-row">
+        <button type="button" id="impUploadBtn">Or choose an Excel / CSV file</button>
+        <input type="file" id="impFile" accept=".xlsx,.csv,.tsv,.txt" class="hidden">
+        <span class="hint" id="impFileName"></span>
+      </div>
+
+      <div id="impWork" class="hidden">
+        <div class="imp-opts">
+          <label><input type="checkbox" id="impHasHeader"> First row contains column names</label>
+        </div>
+        <details class="imp-map-box" id="impMapBox">
+          <summary id="impMapSummary">Column matching</summary>
+          <div class="imp-map" id="impMapGrid"></div>
+        </details>
+        <div id="impSummary"></div>
+        <div class="imp-scroll" id="impPreviewWrap">
+          <table class="ledger" id="impPreview"></table>
+        </div>
+      </div>
+      <div class="imp-empty" id="impEmpty">Nothing pasted yet.</div>
+    </div>
+    <div class="modal-foot">
+      <div class="imp-opts hidden" id="impModeRow" style="margin:0;">
+        <label><input type="radio" name="impMode" value="add" checked> Add below existing rows</label>
+        <label><input type="radio" name="impMode" value="replace"> Replace existing rows</label>
+      </div>
+      <span class="spacer"></span>
+      <button type="button" id="impCancel">Cancel</button>
+      <button type="button" class="primary" id="impGo" disabled>Import</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
@@ -1326,6 +1417,655 @@ function checkForDraftOnLoad(){
 document.querySelector('.wrap').addEventListener('input', scheduleDraftSave);
 document.querySelector('.wrap').addEventListener('change', scheduleDraftSave);
 checkForDraftOnLoad();
+
+// =====================================================================
+// Paste & import: bring in a class list from Excel / Google Sheets (paste
+// or file), match the columns, tidy the values, preview, then import.
+// Existing paste-into-grid behaviour above is untouched.
+// =====================================================================
+const imp = { rows: [], hasHeader: false, map: [], records: [], fileName: '' };
+
+const impEls = {
+  modal: document.getElementById('impModal'),
+  text: document.getElementById('impText'),
+  file: document.getElementById('impFile'),
+  fileName: document.getElementById('impFileName'),
+  work: document.getElementById('impWork'),
+  empty: document.getElementById('impEmpty'),
+  hasHeader: document.getElementById('impHasHeader'),
+  mapBox: document.getElementById('impMapBox'),
+  mapSummary: document.getElementById('impMapSummary'),
+  mapGrid: document.getElementById('impMapGrid'),
+  summary: document.getElementById('impSummary'),
+  preview: document.getElementById('impPreview'),
+  modeRow: document.getElementById('impModeRow'),
+  go: document.getElementById('impGo')
+};
+let impLastFocus = null;
+let impTextTimer = null;
+let impHadExistingRows = false;
+
+const IMP_FIELDS = [{key:'full_name', label:'Full name (First Middle Last)'}]
+  .concat(GRID_COLS.map(c=>({key:c.key, label:c.label})));
+
+function impClean(s){
+  return String(s == null ? '' : s).replace(/[\u00A0\u200B-\u200D\uFEFF]/g,' ').replace(/\s+/g,' ').trim();
+}
+function impNorm(s){ return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g,''); }
+function impNormHeader(s){ return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
+
+// ---- Header recognition ----
+const IMP_EXACT = {};
+Object.keys(HEADER_KEYWORDS).forEach(k=>HEADER_KEYWORDS[k].forEach(w=>{ IMP_EXACT[impNormHeader(w)] = k; }));
+const IMP_EXTRA_HEADERS = {
+  full_name: ['name','full name','fullname','student name','students name','name of student','name of the student','candidate name','participant name'],
+  first_name: ['firstname','given name'],
+  last_name: ['lastname','family name'],
+  age: ['age years','student age'],
+  gender: ['sex'],
+  current_grade: ['current status','student status'],
+  school_name: ['name of school'],
+  college_name: ['college iti','college iti name','institute','institution'],
+  address: ['area','town','location','village city'],
+  mobile_number: ['mobile no','phone number','phone no','contact number','contact no','whatsapp','whatsapp number','whatsapp no','cell'],
+  email_id: ['email address','mail id','e mail id','emailid']
+};
+Object.keys(IMP_EXTRA_HEADERS).forEach(k=>IMP_EXTRA_HEADERS[k].forEach(w=>{ IMP_EXACT[impNormHeader(w)] = k; }));
+
+// Looser matching for headers like "Mobile Number (WhatsApp)". Order matters:
+// school/college/address words are checked before the generic "name".
+const IMP_LOOSE = [
+  ['email_id', /\b(e ?mail|email)\b/],
+  ['mobile_number', /\b(mobile|mob|phone|contact|whatsapp|cell)\b/],
+  ['first_name', /\bfirst\b/],
+  ['middle_name', /\bmiddle\b/],
+  ['last_name', /\b(last|surname)\b/],
+  ['school_name', /\bschool\b/],
+  ['college_name', /\b(college|iti|institute|institution)\b/],
+  ['address', /\b(village|city|address|town|area|location)\b/],
+  ['student_class', /\b(class|std|standard)\b/],
+  ['gender', /\b(gender|sex)\b/],
+  ['age', /\bage\b/],
+  ['current_grade', /\b(status|grade)\b/],
+  ['full_name', /\bname\b/]
+];
+const IMP_HEADER_SKIP = /\b(father|fathers|mother|mothers|guardian|parent|parents|alternate|alt|emergency)\b/;
+
+function impHeaderKey(h){
+  const t = impNormHeader(h);
+  if(!t || IMP_HEADER_SKIP.test(t)) return '';
+  if(IMP_EXACT[t]) return IMP_EXACT[t];
+  for(const [key, re] of IMP_LOOSE){ if(re.test(t)) return key; }
+  return '';
+}
+
+// ---- Value tidying ----
+const IMP_EMPTY_TOKENS = new Set(['-','--','\u2014','na','n/a','n.a','n.a.','nil','none','null','not applicable']);
+function impOptional(s){
+  const t = impClean(s);
+  return IMP_EMPTY_TOKENS.has(t.toLowerCase()) ? '' : t;
+}
+function impNameCase(s){
+  const t = impClean(s);
+  if(t && (t === t.toUpperCase() || t === t.toLowerCase())) return toTitleCase(t);
+  return t;
+}
+function impSplitName(full){
+  let t = impClean(full).replace(/^(mr|mrs|ms|miss|shri|smt|kumari|kum|master)\.?\s+/i,'');
+  if(!t) return ['','',''];
+  const comma = t.match(/^([^,]+),\s*([^,]+)$/); // "Patil, Rahul Ramesh"
+  if(comma){
+    const rest = comma[2].trim().split(' ');
+    return [rest[0], rest.slice(1).join(' '), comma[1].trim()];
+  }
+  const parts = t.split(' ');
+  if(parts.length === 1) return [parts[0], '', ''];
+  if(parts.length === 2) return [parts[0], '', parts[1]];
+  return [parts[0], parts.slice(1, -1).join(' '), parts[parts.length - 1]];
+}
+function impMobile(raw){
+  let t = impClean(raw);
+  if(!t) return '';
+  if(/^\d+(\.\d+)?e\+?\d+$/i.test(t)){ const n = Number(t); if(isFinite(n)) t = n.toFixed(0); }
+  const tokens = t.split(/[\/,;]|\bor\b|\band\b/i);
+  let firstDigits = '';
+  for(const tok of tokens){
+    let d = tok.replace(/\D/g,'');
+    if(d.length === 12 && d.startsWith('91')) d = d.slice(2);
+    else if(d.length === 11 && d.startsWith('0')) d = d.slice(1);
+    else if(d.length === 13 && d.startsWith('091')) d = d.slice(3);
+    if(!firstDigits) firstDigits = d;
+    if(MOBILE_RE.test(d)) return d;
+  }
+  return firstDigits;
+}
+function impEmail(raw){
+  const t = impOptional(raw).replace(/^mailto:/i,'').replace(/[\s,;.]+$/,'').replace(/\s+/g,'');
+  return t.toLowerCase();
+}
+const IMP_GENDER = {
+  m:'male', male:'male', boy:'male', man:'male', gent:'male', '\u092A\u0941\u0930\u0941\u0937':'male', '\u092A\u0941\u0930\u0942\u0937':'male', '\u092E\u0941\u0932\u0917\u093E':'male',
+  f:'female', female:'female', girl:'female', woman:'female', lady:'female', '\u092E\u0939\u093F\u0932\u093E':'female', '\u0938\u094D\u0924\u094D\u0930\u0940':'female', '\u092E\u0941\u0932\u0917\u0940':'female',
+  o:'other', other:'other', transgender:'other', trans:'other', 'non binary':'other', 'third gender':'other'
+};
+function impGender(raw){
+  const t = impClean(raw).toLowerCase().replace(/[^a-z\u0900-\u097F ]/g,'').trim();
+  return IMP_GENDER[t] || '';
+}
+function impClass(raw){
+  const m = String(raw || '').match(/(?:^|\D)(5|6|7|8|9|10)(?!\d)/);
+  return m ? m[1] : '';
+}
+function impGrade(raw){
+  const t = impClean(raw).toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+  if(!t) return {key:'', cls:''};
+  const m = t.match(/^(5|6|7|8|9|10)(th|st|nd|rd)?( std| standard| class)?$/);
+  if(m) return {key:'school', cls:m[1]};
+  if(/\b(iti|diploma|polytechnic|hsc|higher secondary|junior college|11th|12th|xi|xii)\b/.test(t)) return {key:'secondary_iti', cls:''};
+  if(/\b(college|degree|graduate|graduation|undergraduate|postgraduate|university|bsc|bcom|btech|ug|pg)\b/.test(t)) return {key:'college', cls:''};
+  if(/\b(dropout|drop out|not studying|not currently studying|left school)\b/.test(t)) return {key:'dropout', cls:''};
+  if(/\b(working|employed|employee|job|self employed|business|service)\b/.test(t)) return {key:'working', cls:''};
+  if(/\bschool\b/.test(t)) return {key:'school', cls:''};
+  return {key: fuzzyMatchOption(CHOICES.grade_list, raw), cls:''};
+}
+
+// One source row -> one cleaned student record (or null if the row is empty).
+function impBuildRecord(cells){
+  const raw = {};
+  imp.map.forEach((key, i)=>{ if(key) raw[key] = impClean(cells[i]); });
+  if(!Object.keys(raw).some(k=>raw[k] !== '')) return null;
+
+  const v = {}, src = {}, unmatched = new Set(), tidied = new Set(), note = {};
+
+  let first = raw.first_name || '', middle = raw.middle_name || '', last = raw.last_name || '';
+  let nameSrc = null;
+  if(raw.full_name && !first && !last){
+    const p = impSplitName(raw.full_name);
+    first = p[0]; middle = middle || p[1]; last = p[2];
+    nameSrc = raw.full_name;
+  }
+  v.first_name = impNameCase(first);
+  v.middle_name = impNameCase(impOptional(middle));
+  v.last_name = impNameCase(last);
+  src.first_name = nameSrc != null ? nameSrc : raw.first_name;
+  src.middle_name = nameSrc != null ? nameSrc : raw.middle_name;
+  src.last_name = nameSrc != null ? nameSrc : raw.last_name;
+
+  const ageRaw = raw.age || '';
+  const am = ageRaw.match(/^(\d{1,3})(?:\.0+)?\s*(?:yrs?|years?|y)?\.?$/i);
+  v.age = am ? String(parseInt(am[1], 10)) : ageRaw;
+  src.age = raw.age;
+
+  v.gender = impGender(raw.gender || '');
+  if(raw.gender && !v.gender) unmatched.add('gender');
+  src.gender = raw.gender;
+
+  const g = impGrade(raw.current_grade || '');
+  v.current_grade = g.key;
+  let cls = impClass(raw.student_class || '');
+  if(!cls && g.cls) cls = g.cls;
+  v.student_class = cls;
+  if(!v.current_grade && cls){
+    v.current_grade = 'school';
+    tidied.add('current_grade');
+    note.current_grade = 'Set to School because a class was given';
+  }
+  if(raw.current_grade && !v.current_grade) unmatched.add('current_grade');
+  if(raw.student_class && !cls && v.current_grade === 'school') unmatched.add('student_class');
+  if(v.current_grade && v.current_grade !== 'school' && !cls) { /* class not needed */ }
+  src.current_grade = raw.current_grade;
+  src.student_class = raw.student_class;
+
+  v.school_name = impOptional(raw.school_name || '');
+  v.college_name = impOptional(raw.college_name || '');
+  v.address = impClean(raw.address || '');
+  v.mobile_number = impMobile(raw.mobile_number || '');
+  v.email_id = impEmail(raw.email_id || '');
+  src.school_name = raw.school_name; src.college_name = raw.college_name; src.address = raw.address;
+  src.mobile_number = raw.mobile_number; src.email_id = raw.email_id;
+
+  ['first_name','middle_name','last_name','age','mobile_number','email_id'].forEach(k=>{
+    if(src[k] && impNorm(src[k]) !== impNorm(v[k])){
+      tidied.add(k);
+      note[k] = 'Was: ' + src[k];
+    }
+  });
+  return {v, raw: src, unmatched, tidied, note};
+}
+
+function impValidate(v, counts, existingSet){
+  const e = {};
+  if(!v.first_name) e.first_name = 'First name is required';
+  if(!v.last_name) e.last_name = 'Last name is required';
+  const a = parseInt(v.age, 10);
+  if(!v.age || isNaN(a) || a < MIN_AGE || a > MAX_AGE) e.age = `Age must be ${MIN_AGE} to ${MAX_AGE}`;
+  if(!v.gender) e.gender = 'Pick a gender';
+  if(!v.current_grade) e.current_grade = 'Pick a status';
+  if(v.current_grade === 'school' && !v.student_class) e.student_class = 'Class is required for school students';
+  if(v.current_grade === 'school' && !v.school_name) e.school_name = 'School name is required';
+  if((v.current_grade === 'secondary_iti' || v.current_grade === 'college') && !v.college_name) e.college_name = 'College / ITI name is required';
+  if(!v.address) e.address = 'Village / city is required';
+  if(!MOBILE_RE.test(v.mobile_number || '')) e.mobile_number = 'Needs 10 digits starting with 6 to 9';
+  else if(existingSet.has(v.mobile_number)) e.mobile_number = 'This number is already in the grid above';
+  else if(counts[v.mobile_number] > 1) e.mobile_number = 'This number appears more than once in this batch';
+  if(v.email_id && !EMAIL_RE.test(v.email_id)) e.email_id = 'Email format looks wrong';
+  return e;
+}
+
+// ---- Parsing pasted text / files ----
+function impParseDelimited(text, delim){
+  const rows = []; let row = [], cell = '', inQ = false;
+  for(let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if(inQ){
+      if(ch === '"'){ if(text[i+1] === '"'){ cell += '"'; i++; } else inQ = false; }
+      else cell += ch;
+    } else if(ch === '"' && cell === ''){
+      inQ = true;
+    } else if(ch === delim){
+      row.push(cell); cell = '';
+    } else if(ch === '\n' || ch === '\r'){
+      if(ch === '\r' && text[i+1] === '\n') i++;
+      row.push(cell); rows.push(row); row = []; cell = '';
+    } else {
+      cell += ch;
+    }
+  }
+  if(cell !== '' || row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+function impParseText(text, forcedDelim){
+  text = String(text || '').replace(/^\uFEFF/, '');
+  if(!text.trim()) return [];
+  let delim = forcedDelim || '\t';
+  if(!forcedDelim && !text.includes('\t')){
+    const lines = text.split(/\r?\n/).filter(l=>l.trim() !== '').slice(0, 10);
+    const counts = lines.map(l=>(l.match(/,/g) || []).length);
+    if(counts[0] >= 2 && counts.filter(c=>c === counts[0]).length >= Math.ceil(counts.length * 0.8)) delim = ',';
+  }
+  return impParseDelimited(text, delim);
+}
+function impCellText(cell){
+  try{ const t = cell.text; if(t !== undefined && t !== null) return String(t); } catch(e){}
+  const v = cell.value;
+  return v == null ? '' : String(v);
+}
+async function impReadFile(file){
+  const name = file.name.toLowerCase();
+  if(name.endsWith('.csv')) return impParseText(await file.text(), ',');
+  if(name.endsWith('.tsv') || name.endsWith('.txt')) return impParseText(await file.text());
+  if(name.endsWith('.xls')) throw new Error('Old .xls files are not supported. Open it in Excel, choose Save As .xlsx (or .csv), then upload again.');
+  if(typeof ExcelJS === 'undefined') throw new Error('Could not load the Excel reader (it needs an internet connection once). Paste the rows instead, or try again when online.');
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await file.arrayBuffer());
+  const ws = wb.getWorksheet('Students') || wb.worksheets.find(w=>w.actualRowCount > 0) || wb.worksheets[0];
+  if(!ws) return [];
+  const matrix = [];
+  const cols = ws.columnCount;
+  ws.eachRow({includeEmpty: false}, row=>{
+    const arr = [];
+    for(let c = 1; c <= cols; c++) arr.push(impCellText(row.getCell(c)));
+    matrix.push(arr);
+  });
+  return matrix;
+}
+
+// ---- Matching columns ----
+function impColumnIsSerial(rows, col){
+  if(rows.length < 2) return false;
+  let ok = 0;
+  rows.forEach((r, i)=>{ if(/^\d{1,3}$/.test(r[col] || '') && Number(r[col]) === i + 1) ok++; });
+  return ok >= Math.ceil(rows.length * 0.8);
+}
+function impLooksLikeHeader(row){
+  if(!row || !row.length) return false;
+  let hits = 0;
+  for(const c of row){
+    if(MOBILE_RE.test(impMobile(c))) return false; // a real phone number means this is a student row
+    if(impHeaderKey(c)) hits++;
+  }
+  return hits >= Math.min(2, row.length);
+}
+function impAutoMap(){
+  const width = imp.rows[0].length;
+  if(imp.hasHeader){
+    const used = new Set();
+    imp.map = imp.rows[0].map(h=>{
+      const k = impHeaderKey(h);
+      if(k && !used.has(k)){ used.add(k); return k; }
+      return '';
+    });
+  } else {
+    imp.map = new Array(width).fill('');
+    let start = (width > 1 && impColumnIsSerial(imp.rows, 0)) ? 1 : 0;
+    for(let c = start, f = 0; c < width && f < GRID_COLS.length; c++, f++) imp.map[c] = GRID_COLS[f].key;
+  }
+}
+function impMissingFields(){
+  const m = new Set(imp.map.filter(Boolean));
+  const out = [];
+  const hasName = m.has('full_name') || (m.has('first_name') && m.has('last_name'));
+  if(!hasName){
+    if(!m.has('full_name') && !m.has('first_name')) out.push('Name');
+    else if(!m.has('last_name') && !m.has('full_name')) out.push('Last Name');
+  }
+  if(!m.has('age')) out.push('Age');
+  if(!m.has('gender')) out.push('Gender');
+  if(!m.has('current_grade') && !m.has('student_class')) out.push('Status');
+  if(!m.has('address')) out.push('Village / City Area');
+  if(!m.has('mobile_number')) out.push('Mobile Number');
+  return out;
+}
+
+// ---- Rendering ----
+function impSetVisible(hasData){
+  impEls.work.classList.toggle('hidden', !hasData);
+  impEls.empty.classList.toggle('hidden', hasData);
+}
+function impSourceColLabel(i){
+  const h = imp.hasHeader ? (imp.rows[0][i] || '') : '';
+  return h || ('Column ' + (i + 1));
+}
+function impRenderMapping(openIfNeeded){
+  const grid = impEls.mapGrid;
+  grid.innerHTML = '';
+  const dataRows = imp.rows.slice(imp.hasHeader ? 1 : 0, (imp.hasHeader ? 1 : 0) + 8);
+  imp.map.forEach((key, i)=>{
+    const chip = document.createElement('div');
+    chip.className = 'imp-chip' + (key ? '' : ' ignored');
+    const title = document.createElement('div');
+    title.className = 'src'; title.textContent = impSourceColLabel(i);
+    const sample = document.createElement('div');
+    sample.className = 'sample';
+    const s = dataRows.map(r=>r[i]).find(x=>x);
+    sample.textContent = s || '';
+    const sel = document.createElement('select');
+    sel.dataset.col = i;
+    sel.setAttribute('aria-label', 'Field for ' + impSourceColLabel(i));
+    const o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'Ignore this column'; sel.appendChild(o0);
+    IMP_FIELDS.forEach(f=>{ const o = document.createElement('option'); o.value = f.key; o.textContent = f.label; sel.appendChild(o); });
+    sel.value = key;
+    chip.appendChild(title); chip.appendChild(sample); chip.appendChild(sel);
+    grid.appendChild(chip);
+  });
+  const matched = imp.map.filter(Boolean).length;
+  const missing = impMissingFields();
+  impEls.mapSummary.textContent = `Column matching: ${matched} of ${imp.map.length} columns matched` + (missing.length ? ` (missing: ${missing.join(', ')})` : '');
+  if(openIfNeeded) impEls.mapBox.open = !imp.hasHeader || missing.length > 0;
+}
+function impRenderPreview(){
+  const tbl = impEls.preview;
+  tbl.innerHTML = '';
+  const thead = document.createElement('thead');
+  const hr = document.createElement('tr');
+  ['#'].concat(GRID_COLS.map(c=>c.label)).concat(['']).forEach(t=>{
+    const th = document.createElement('th'); th.textContent = t; hr.appendChild(th);
+  });
+  thead.appendChild(hr); tbl.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  imp.records.forEach((rec, ri)=>{
+    const tr = document.createElement('tr');
+    const rn = document.createElement('td'); rn.className = 'rownum'; rn.textContent = ri + 1; tr.appendChild(rn);
+    GRID_COLS.forEach(col=>{
+      const td = document.createElement('td');
+      td.dataset.key = col.key;
+      if(col.type === 'select'){
+        const sel = document.createElement('select');
+        fillSelect(sel, CHOICES[col.list], '-');
+        sel.value = rec.v[col.key] || '';
+        td.appendChild(sel);
+        if(rec.unmatched.has(col.key) && rec.raw[col.key]){
+          const w = document.createElement('div'); w.className = 'was'; w.textContent = 'Pasted: ' + rec.raw[col.key];
+          td.appendChild(w);
+        }
+      } else {
+        td.setAttribute('contenteditable', 'true');
+        td.dataset.ph = col.ph || '';
+        td.textContent = rec.v[col.key] || '';
+      }
+      tr.appendChild(td);
+    });
+    const rm = document.createElement('td'); rm.className = 'rm';
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = '\u00D7';
+    b.setAttribute('aria-label', 'Remove row ' + (ri + 1)); b.title = 'Leave this row out';
+    rm.appendChild(b); tr.appendChild(rm);
+    tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody);
+  impRefreshFlags();
+}
+function impMode(){
+  if(!impHadExistingRows) return 'replace';
+  const r = document.querySelector('input[name="impMode"]:checked');
+  return r ? r.value : 'add';
+}
+function impExistingMobiles(){
+  if(impMode() !== 'add') return [];
+  return readGridRows().map(r=>r.data).filter(d=>!isRowBlank(d)).map(d=>d.mobile_number).filter(m=>MOBILE_RE.test(m || ''));
+}
+function impRefreshFlags(){
+  const tbody = impEls.preview.querySelector('tbody');
+  if(!tbody) return;
+  const existing = impExistingMobiles();
+  const existingSet = new Set(existing);
+  const counts = {};
+  existing.forEach(m=>{ counts[m] = (counts[m] || 0) + 1; });
+  imp.records.forEach(r=>{ const m = r.v.mobile_number; if(MOBILE_RE.test(m || '')) counts[m] = (counts[m] || 0) + 1; });
+
+  let bad = 0, tidiedCells = 0;
+  const badRows = [];
+  imp.records.forEach((rec, i)=>{
+    const tr = tbody.children[i];
+    if(!tr) return;
+    const errs = impValidate(rec.v, counts, existingSet);
+    let rowBad = false;
+    GRID_COLS.forEach((col, ci)=>{
+      const td = tr.children[ci + 1];
+      td.classList.remove('cell-bad', 'cell-tidied');
+      td.removeAttribute('title');
+      let msg = errs[col.key];
+      if(msg && col.type === 'select' && rec.unmatched.has(col.key) && rec.raw[col.key]){
+        msg = `Pasted "${rec.raw[col.key]}" was not recognised. Pick the right option.`;
+      }
+      if(msg){
+        td.classList.add('cell-bad'); td.title = msg; rowBad = true;
+      } else if(rec.tidied.has(col.key)){
+        td.classList.add('cell-tidied'); td.title = rec.note[col.key] || 'Tidied automatically';
+        tidiedCells++;
+      }
+    });
+    if(rowBad){ bad++; badRows.push(i + 1); }
+  });
+
+  const total = imp.records.length;
+  const sum = impEls.summary;
+  sum.innerHTML = '';
+  sum.classList.add('show');
+  const line = document.createElement('div'); line.className = 'line';
+  const a = document.createElement('span'); a.className = 'ok';
+  a.textContent = `${total} student${total === 1 ? '' : 's'} found, ${total - bad} ready`;
+  line.appendChild(a);
+  if(bad){
+    const b = document.createElement('span'); b.className = 'bad';
+    b.textContent = `, ${bad} need${bad === 1 ? 's' : ''} a fix (red cells; row${badRows.length === 1 ? '' : 's'} ${badRows.slice(0, 10).join(', ')}${badRows.length > 10 ? '\u2026' : ''})`;
+    line.appendChild(b);
+  }
+  sum.appendChild(line);
+
+  const notes = [];
+  const ignored = [];
+  imp.map.forEach((k, i)=>{
+    if(k) return;
+    const has = imp.rows.slice(imp.hasHeader ? 1 : 0).some(r=>r[i]);
+    const label = impSourceColLabel(i);
+    if(has && label !== '#') ignored.push(label);
+  });
+  if(ignored.length) notes.push('Ignored columns: ' + ignored.join(', ') + '.');
+  const missing = impMissingFields();
+  if(missing.length) notes.push('No column matched for: ' + missing.join(', ') + '. Match them under Column matching, or fill them in below.');
+  if(tidiedCells) notes.push(`${tidiedCells} value${tidiedCells === 1 ? ' was' : 's were'} tidied automatically (beige cells; hover to see the original).`);
+  if(bad) notes.push('Type in a cell or pick from a dropdown to fix it. You can also import now and fix the rest in the grid.');
+  notes.forEach(n=>{ const d = document.createElement('div'); d.className = 'note'; d.textContent = n; sum.appendChild(d); });
+
+  impEls.go.disabled = total === 0;
+  impEls.go.textContent = total ? `Import ${total} student${total === 1 ? '' : 's'}` : 'Import';
+}
+function impRebuild(openMapIfNeeded){
+  const dataRows = imp.rows.slice(imp.hasHeader ? 1 : 0);
+  imp.records = dataRows.map(impBuildRecord).filter(Boolean);
+  impRenderMapping(openMapIfNeeded);
+  impRenderPreview();
+}
+function impSetSource(rows){
+  rows = rows.map(r=>r.map(impClean)).filter(r=>r.some(c=>c !== ''));
+  if(!rows.length){
+    imp.rows = []; imp.records = []; imp.map = [];
+    impSetVisible(false);
+    impEls.go.disabled = true; impEls.go.textContent = 'Import';
+    return;
+  }
+  let width = 0;
+  rows.forEach(r=>{ for(let i = r.length - 1; i >= 0; i--){ if(r[i] !== ''){ width = Math.max(width, i + 1); break; } } });
+  imp.rows = rows.map(r=>{ const out = r.slice(0, width); while(out.length < width) out.push(''); return out; });
+  imp.hasHeader = impLooksLikeHeader(imp.rows[0]);
+  impEls.hasHeader.checked = imp.hasHeader;
+  impAutoMap();
+  impSetVisible(true);
+  impRebuild(true);
+}
+
+// ---- Open / close ----
+function impOpen(){
+  impLastFocus = document.activeElement;
+  imp.rows = []; imp.records = []; imp.map = []; imp.fileName = '';
+  impEls.text.value = '';
+  impEls.fileName.textContent = '';
+  impEls.fileName.style.color = '';
+  impEls.file.value = '';
+  impEls.summary.classList.remove('show');
+  impSetVisible(false);
+  impEls.go.disabled = true; impEls.go.textContent = 'Import';
+  impHadExistingRows = readGridRows().some(r=>!isRowBlank(r.data));
+  impEls.modeRow.classList.toggle('hidden', !impHadExistingRows);
+  const addRadio = document.querySelector('input[name="impMode"][value="add"]');
+  if(addRadio) addRadio.checked = true;
+  impEls.modal.classList.add('open');
+  document.body.classList.add('modal-open');
+  impEls.modal.scrollTop = 0;
+  setTimeout(()=>impEls.text.focus(), 30);
+}
+function impClose(){
+  impEls.modal.classList.remove('open');
+  document.body.classList.remove('modal-open');
+  if(impLastFocus && impLastFocus.focus) impLastFocus.focus();
+}
+
+function impDoImport(){
+  const recs = imp.records;
+  if(!recs.length) return;
+  const mode = impMode();
+  if(mode === 'replace'){
+    els.studentBody.innerHTML = '';
+  } else {
+    while(els.studentBody.lastElementChild && trIsBlank(els.studentBody.lastElementChild)){
+      els.studentBody.removeChild(els.studentBody.lastElementChild);
+    }
+  }
+  recs.forEach(rec=>{ const tr = addRow(); fillRowFromSavedData(tr, rec.v); });
+  if(!els.studentBody.children.length) addRow();
+  renumberRows();
+  els.numStudents.value = els.studentBody.children.length;
+  const errs = validateGrid();
+  computeTotals();
+  scheduleDraftSave();
+  impClose();
+  els.statusMsg.style.color = errs.length ? 'var(--rust)' : 'var(--teal)';
+  els.statusMsg.textContent = `Imported ${recs.length} student${recs.length === 1 ? '' : 's'}.` +
+    (errs.length ? ` ${errs.length} row${errs.length === 1 ? '' : 's'} still need attention (highlighted in the grid).` : ' Press "Check duplicates" to compare with saved records.');
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.getElementById('studentGrid').scrollIntoView({behavior: reduce ? 'auto' : 'smooth', block: 'start'});
+}
+
+// ---- Wiring ----
+document.getElementById('openPasteBtn').addEventListener('click', impOpen);
+document.getElementById('openUploadBtn').addEventListener('click', ()=>{ impOpen(); impEls.file.click(); });
+document.getElementById('impClose').addEventListener('click', impClose);
+document.getElementById('impCancel').addEventListener('click', impClose);
+document.getElementById('impUploadBtn').addEventListener('click', ()=>impEls.file.click());
+impEls.go.addEventListener('click', impDoImport);
+document.addEventListener('keydown', e=>{
+  if(e.key === 'Escape' && impEls.modal.classList.contains('open')) impClose();
+});
+
+impEls.text.addEventListener('input', ()=>{
+  clearTimeout(impTextTimer);
+  impTextTimer = setTimeout(()=>{
+    impEls.fileName.textContent = '';
+    impSetSource(impParseText(impEls.text.value));
+  }, 120);
+});
+impEls.file.addEventListener('change', async ()=>{
+  const f = impEls.file.files && impEls.file.files[0];
+  if(!f) return;
+  impEls.fileName.style.color = '';
+  impEls.fileName.textContent = 'Reading ' + f.name + '\u2026';
+  try{
+    const rows = await impReadFile(f);
+    impEls.text.value = '';
+    impEls.fileName.textContent = f.name;
+    impSetSource(rows);
+    if(!rows.length){ impEls.fileName.style.color = 'var(--rust)'; impEls.fileName.textContent = f.name + ': no data found in this file.'; }
+  } catch(err){
+    impEls.fileName.style.color = 'var(--rust)';
+    impEls.fileName.textContent = err.message || 'Could not read that file.';
+  }
+});
+impEls.hasHeader.addEventListener('change', ()=>{
+  imp.hasHeader = impEls.hasHeader.checked;
+  impAutoMap();
+  impRebuild(true);
+});
+impEls.mapGrid.addEventListener('change', e=>{
+  const sel = e.target.closest('select[data-col]');
+  if(!sel) return;
+  const col = parseInt(sel.dataset.col, 10);
+  const val = sel.value;
+  if(val) imp.map = imp.map.map((k, i)=>(i !== col && k === val) ? '' : k);
+  imp.map[col] = val;
+  impRebuild(false);
+});
+function impOnPreviewEdit(e){
+  const td = e.target.closest('td[data-key]');
+  if(!td) return;
+  const tr = td.parentElement;
+  const ri = [...tr.parentElement.children].indexOf(tr);
+  const rec = imp.records[ri];
+  if(!rec) return;
+  const key = td.dataset.key;
+  rec.v[key] = (e.target.tagName === 'SELECT') ? e.target.value : impClean(td.textContent);
+  rec.tidied.delete(key); rec.unmatched.delete(key);
+  const w = td.querySelector('.was'); if(w) w.remove();
+  impRefreshFlags();
+}
+impEls.preview.addEventListener('input', impOnPreviewEdit);
+impEls.preview.addEventListener('change', e=>{ if(e.target.tagName === 'SELECT') impOnPreviewEdit(e); });
+impEls.preview.addEventListener('paste', e=>{
+  const td = e.target.closest('td[contenteditable]');
+  if(!td) return;
+  e.preventDefault();
+  const t = ((e.clipboardData || window.clipboardData).getData('text') || '').replace(/\s*[\r\n\t]+\s*/g, ' ');
+  document.execCommand('insertText', false, t);
+});
+impEls.preview.addEventListener('click', e=>{
+  const b = e.target.closest('td.rm button');
+  if(!b) return;
+  const tr = b.closest('tr');
+  const ri = [...tr.parentElement.children].indexOf(tr);
+  imp.records.splice(ri, 1);
+  impRenderPreview();
+});
+document.querySelectorAll('input[name="impMode"]').forEach(r=>r.addEventListener('change', impRefreshFlags));
+
 </script>
 </body>
 </html>
