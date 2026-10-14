@@ -1486,10 +1486,10 @@ async function submitBatch(){
     if(result.status === 'success'){
       const bn = result.batch_number || els.batchNumber.value;
       const label = result.already_saved
-        ? `✓ Already saved earlier as Batch ${bn} (ID ${result.registration_id}), not added again`
+        ? `✓ Already saved earlier as Batch ${bn}, not added again`
         : result.merged
           ? `✓ Added ${result.students_saved} to existing Batch ${bn}. Now ${result.batch_total_students} total, ₹${Number(result.batch_pending_balance).toLocaleString('en-IN')} pending`
-          : `✓ Registered Batch ${bn} (ID ${result.registration_id})`;
+          : `✓ Registered Batch ${bn}`;
       // Start a clean form so the same batch cannot be sent twice by accident.
       clearFormFields();
       clearTimeout(draftSaveTimer);
