@@ -323,6 +323,9 @@ table.ledger td.rm button:hover{color:var(--rust);background:transparent;}
 .nomobile-box .sub{font-size:12px;color:var(--ink-soft);margin:4px 0 0 24px;}
 .nomobile-box .field-row{margin:12px 0 0;}
 #impSummary .linkbtn{margin-top:6px;font-size:12.5px;padding:6px 12px;}
+#askModal{z-index:60;align-items:center;}
+#askModal .modal-box{max-width:460px;}
+#askMsg{white-space:pre-line;margin:0;font-size:14.5px;line-height:1.5;}
 .hidden{display:none !important;}
 .conditional{display:none;}
 .conditional.show{display:flex;}
@@ -504,6 +507,16 @@ table.ledger td.rm button:hover{color:var(--rust);background:transparent;}
 </div>
 
 
+<div class="modal-back" id="askModal" role="alertdialog" aria-modal="true" aria-labelledby="askMsg">
+  <div class="modal-box">
+    <div class="modal-body" style="padding-top:22px;"><p id="askMsg"></p></div>
+    <div class="modal-foot">
+      <button type="button" id="askCancel">Cancel</button>
+      <button type="button" class="primary" id="askOk">OK</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-back" id="impModal" role="dialog" aria-modal="true" aria-labelledby="impTitle">
   <div class="modal-box">
     <div class="modal-head">
@@ -557,6 +570,40 @@ const CONFIG = {
   SECRET_TOKEN: "AjAYME31Z5dgntu60g34"
 };
 // --------------------------------------------------------------------
+
+// In-page replacement for window.confirm(). Embedded pages (e.g. Google Sites)
+// are sandboxed and the browser silently ignores confirm(), which made every
+// confirmation behave like "Cancel". This works everywhere.
+function askConfirm(message, okText, cancelText){
+  return new Promise(resolve=>{
+    const back = document.getElementById('askModal');
+    const msg = document.getElementById('askMsg');
+    const ok = document.getElementById('askOk');
+    const cancel = document.getElementById('askCancel');
+    const prevFocus = document.activeElement;
+    msg.textContent = message;
+    ok.textContent = okText || 'OK';
+    cancel.textContent = cancelText || 'Cancel';
+    back.classList.add('open');
+    document.body.classList.add('modal-open');
+    function done(v){
+      back.classList.remove('open');
+      if(!document.getElementById('impModal').classList.contains('open')) document.body.classList.remove('modal-open');
+      ok.removeEventListener('click', onOk);
+      cancel.removeEventListener('click', onCancel);
+      document.removeEventListener('keydown', onKey, true);
+      if(prevFocus && prevFocus.focus) prevFocus.focus();
+      resolve(v);
+    }
+    function onOk(){ done(true); }
+    function onCancel(){ done(false); }
+    function onKey(e){ if(e.key === 'Escape'){ e.stopPropagation(); done(false); } }
+    ok.addEventListener('click', onOk);
+    cancel.addEventListener('click', onCancel);
+    document.addEventListener('keydown', onKey, true);
+    setTimeout(()=>cancel.focus(), 20); // default to the safe choice
+  });
+}
 
 let batchExistingCount = 0;       // students already saved under this course + batch (for top-ups)
 let scriptSupportsBlankMobiles = false; // set true once the updated Apps Script answers
@@ -873,12 +920,12 @@ els.addRowBtn.addEventListener('click', ()=>{
   addRow();
   els.numStudents.value = els.studentBody.children.length;
 });
-els.clearGridBtn.addEventListener('click', ()=>{
-  if(confirm('Clear all pasted student rows?')) clearGrid();
+els.clearGridBtn.addEventListener('click', async ()=>{
+  if(await askConfirm('Clear all student rows?', 'Clear rows', 'Keep rows')) clearGrid();
 });
 
-function resetForm(){
-  if(!confirm('Reset the whole form? Everything entered so far will be cleared.')) return;
+async function resetForm(){
+  if(!(await askConfirm('Reset the whole form? Everything entered so far will be cleared.', 'Reset form', 'Keep editing'))) return;
   els.courseType.value = '';
   els.courseType.dispatchEvent(new Event('change'));
   els.enrollDate.value = '';
@@ -1271,7 +1318,12 @@ async function submitBatch(){
 
   const anyBlankMobile = rows.some(d=>!d.mobile_number);
   if(rows.length && rows.every(d=>!d.mobile_number) && !contactNumber){
-    if(!confirm('None of these students has a phone number and no school contact number was entered, so nobody could be reached about this batch.\n\nSave anyway?')) return;
+    if(!(await askConfirm('None of these students has a phone number and no school contact number was entered, so nobody could be reached about this batch.\n\nSave anyway?', 'Save anyway', 'Go back'))){
+      els.statusMsg.style.color = 'var(--rust)';
+      els.statusMsg.textContent = 'Not saved yet: no school contact number was entered. Add one above the student grid, or press Register batch again and choose OK to save without it.';
+      els_schoolContactNumber().focus();
+      return;
+    }
   }
 
   els.statusMsg.style.color = 'var(--ink-soft)';
@@ -1292,10 +1344,11 @@ async function submitBatch(){
   els.statusMsg.textContent = 'Checking for duplicates…';
   const dupMatches = await checkDuplicates();
   if(dupMatches.length){
-    const proceed = confirm(
-      `${dupMatches.length} mobile number(s) already appear in your records (highlighted in amber below).\n\n` +
+    const proceed = await askConfirm(
+      `${dupMatches.length} mobile number(s) already appear in your records (highlighted in amber in the grid).\n\n` +
       `This might be a genuine repeat student enrolling in another course, or an accidental double-entry.\n\n` +
-      `Continue with registration anyway?`
+      `Continue with registration anyway?`,
+      'Register anyway', 'Review rows'
     );
     if(!proceed){
       els.statusMsg.textContent = 'Submission paused. Review the highlighted rows, then submit again when ready.';
@@ -1320,6 +1373,7 @@ async function submitBatch(){
     if(file.size > MAX_PROOF_BYTES){
       els.statusMsg.style.color = 'var(--rust)';
       els.statusMsg.textContent = 'Payment screenshot is too large (max 5MB). Attach a smaller image or compress it, then try again.';
+      els.submitBtn.disabled = false;
       return;
     }
     proofName = file.name;
@@ -1391,7 +1445,14 @@ async function submitBatch(){
   }
 }
 
-els.submitBtn.addEventListener('click', submitBatch);
+els.submitBtn.addEventListener('click', ()=>{
+  submitBatch().catch(err=>{
+    console.error(err);
+    els.submitBtn.disabled = false;
+    els.statusMsg.style.color = 'var(--rust)';
+    els.statusMsg.textContent = 'Could not save because of an unexpected error: ' + (err && err.message ? err.message : err) + '. Your data is still on this page.';
+  });
+});
 refreshPaymentConditionals();
 
 // ---- Draft autosave (browser local storage; this page runs outside Claude's
@@ -1493,7 +1554,7 @@ function restoreDraft(state){
   els.statusMsg.style.color = 'var(--brass-dark)';
 }
 
-function checkForDraftOnLoad(){
+async function checkForDraftOnLoad(){
   try{
     const raw = localStorage.getItem(DRAFT_KEY);
     if(!raw) return;
@@ -1502,7 +1563,7 @@ function checkForDraftOnLoad(){
       (state.students && state.students.some(d=>d.first_name || d.mobile_number));
     if(!hasContent){ clearDraft(); return; }
     const when = state.savedAt ? new Date(state.savedAt).toLocaleString('en-IN') : 'earlier';
-    if(confirm(`Found an unsaved draft from ${when}, probably from a closed tab or browser crash.\n\nRestore it? (Cancel discards it and starts fresh.)`)){
+    if(await askConfirm(`Found an unsaved draft from ${when}, probably from a closed tab or browser crash.\n\nRestore it? (Discard starts fresh.)`, 'Restore draft', 'Discard')){
       restoreDraft(state);
     } else {
       clearDraft();
